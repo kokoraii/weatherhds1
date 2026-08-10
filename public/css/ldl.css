@@ -1,8 +1,9 @@
 .ldl-slides {
-  width: 96%;
-  height: 75%;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
   font-family: var(--tertiary-font-family);
-  padding-bottom: 2%;
+  padding-bottom: 0;
 }
 .ldl-slide {
   width: 100%;
@@ -66,13 +67,13 @@
 .ldl-carousel-current {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   padding: 0 16px;
-  flex: 0 0 24%;
-  width: 24%;
-  min-width: 24%;
+  flex: 0 0 252px;
+  width: 252px;
+  min-width: 252px;
   flex-shrink: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--text-soft);
   text-shadow: 1px 1px 4px var(--color-panel);
   backdrop-filter: blur(120px);
@@ -85,6 +86,10 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 2px 4px 12px var(--color-panel), inset 0 0 0 color-mix(in srgb, var(--text) 10%, transparent), 2px 4px 12px var(--color-panel);
   box-sizing: border-box;
   z-index: 1;
+}
+
+.ldl-carousel-current:empty {
+  visibility: hidden;
 }
 .ldl-carousel-container {
   position: relative;
@@ -213,7 +218,8 @@
   position: relative;
   top: auto;
   width: 100%;
-  flex: 0 0 82px;
+  flex: 1 1 auto;
+  min-height: 82px;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -221,13 +227,13 @@
   justify-content: flex-end;
   background: linear-gradient(135deg, rgba(2, 8, 18, 0.08), rgba(18, 78, 132, 0.14));
   border-bottom: 0;
-  padding: 14px 28px 0 96px;
+  padding: 18px 28px 18px 60px;
   border-bottom-right-radius: 0;
 }
 
 .ldl-provider-logo {
   max-width: 72%;
-  max-height: 72%;
+  max-height: 96px;
   width: auto;
   height: auto;
   object-fit: contain;
@@ -272,6 +278,7 @@
   width: auto;
   height: 100%;
   overflow: hidden;
+  container: ldl-main / inline-size;
 }
 
 /* BULLETIN/ALERTS */
@@ -426,10 +433,10 @@
 }
 /* LDL CURRENT CONDITIONS */
 #ldl-current {
-  align-items: center;
+  align-items: stretch;
   justify-content: stretch;
-  gap: 30px;
-  padding: 0 28px;
+  gap: 18px;
+  padding: 0 22px;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
@@ -441,11 +448,13 @@
 
 .ldl-current-details-group {
   display: grid;
-  grid-template-columns: clamp(220px, 17%, 270px) minmax(340px, 1fr) minmax(330px, 0.95fr);
-  flex-direction: row;
-  align-items: center;
-  justify-content: stretch;
-  gap: 38px;
+  grid-template-columns: 184px repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "wind dewpoint dewpoint visibility visibility uv uv"
+    "wind humidity humidity humidity pressure pressure pressure";
+  align-items: stretch;
+  gap: 0;
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
@@ -453,8 +462,8 @@
 }
 
 .ldl-current-icon {
-  width: 108px;
-  height: 108px;
+  width: 92px;
+  height: 92px;
   flex: 0 0 auto;
   object-fit: contain;
   background: transparent;
@@ -476,64 +485,42 @@
 
 .ldl-current-summary-group {
   display: flex;
-  flex: 0 1 31%;
+  flex: 0 1 320px;
   width: auto;
-  min-width: 430px;
-  max-width: 540px;
+  min-width: 300px;
+  max-width: 340px;
   height: 100%;
   flex-direction: row;
   align-items: center;
   align-self: center;
-  gap: 22px;
+  gap: 16px;
   margin-left: 0;
   background: transparent !important;
   background-image: none !important;
   border-radius: 0;
-  padding: 0 24px 0 8px;
+  padding: 0 10px 0 0;
   box-shadow: none;
   border: 0;
   box-sizing: border-box;
 }
 
 .ldl-current-details-extra {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  flex: 1;
-  justify-content: center;
-  gap: 0;
-  min-width: 0;
-  max-width: none;
-  width: 100%;
-  overflow: visible;
-  background: transparent !important;
-  background-image: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-.ldl-current-wind-direction-indicator + .ldl-current-details-extra::before {
-  content: '';
-  position: absolute;
-  left: -19px;
-  top: 20px;
-  bottom: 20px;
-  width: 1px;
-  background: rgba(205, 232, 255, 0.34);
+  display: contents;
 }
 
 .ldl-current-label {
-  font-size: 17pt;
+  font-size: 15pt;
   color: rgba(226, 241, 255, 0.54);
   font-weight: 620;
   text-shadow: none;
   text-transform: uppercase;
   white-space: nowrap;
+  letter-spacing: 0.035em;
+  line-height: 1;
 }
 
 .ldl-current-condition {
-  font-size: var(--text-sm);
+  font-size: var(--text-vs);
   font-weight: 560;
   line-height: 0.96;
   color: var(--text);
@@ -552,7 +539,7 @@
 }
 
 .ldl-current-temp {
-  font-size: 64pt;
+  font-size: 58pt;
   letter-spacing: 0;
   font-weight: 260;
   line-height: 0.76;
@@ -560,7 +547,7 @@
 }
 
 .ldl-current-value {
-  font-size: 25pt;
+  font-size: 24pt;
   font-weight: 540;
   text-shadow: none;
 }
@@ -568,15 +555,17 @@
 .ldl-current-detail {
   position: relative;
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 18px;
-  min-height: 38px;
-  padding: 0;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 12px;
   border-radius: 0;
   box-shadow: none;
   border: 0;
+  border-left: 1px solid rgba(205, 232, 255, 0.24);
   width: 100%;
   background: none !important;
   background-image: none !important;
@@ -600,16 +589,31 @@
 
 .ldl-current-detail > :last-child {
   color: var(--text);
-  font-size: 25pt;
+  font-size: 24pt;
   font-weight: 540;
-  text-align: right;
+  line-height: 1;
+  text-align: center;
   white-space: nowrap;
-  overflow: visible;
-  text-overflow: clip;
-  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+#ldl-current-dewpoint { grid-area: dewpoint; }
+#ldl-current-visibility { grid-area: visibility; }
+#ldl-current-uv { grid-area: uv; }
+#ldl-current-humidity {
+  grid-area: humidity;
+  border-top: 1px solid rgba(205, 232, 255, 0.24);
+}
+#ldl-current-pressure {
+  grid-area: pressure;
+  border-top: 1px solid rgba(205, 232, 255, 0.24);
 }
 
 .ldl-current-wind-direction-indicator {
+  grid-area: wind;
   display: flex;
   width: 100%;
   height: calc(100% - 4px);
@@ -620,8 +624,7 @@
   white-space: nowrap;
   letter-spacing: 0.001em;
   line-height: 0.2;
-  padding-right: 0;
-  border-right: 0;
+  padding-right: 14px;
   box-sizing: border-box;
 }
 
@@ -636,9 +639,10 @@
 
 .ldl-current-wind-compass {
   position: relative;
-  width: 220px;
-  height: 220px;
-  flex: 0 0 220px;
+  width: 184px;
+  height: 184px;
+  flex: 0 0 184px;
+  --ldl-wind-arrow-radius: -80px;
   isolation: isolate;
 }
 
@@ -647,14 +651,14 @@
   inset: 0;
   border-radius: 999px;
   background: transparent;
-  border: 13px solid rgba(247, 251, 255, 0.82);
+  border: 11px solid rgba(247, 251, 255, 0.82);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 
 .ldl-current-wind-inner {
   position: absolute;
-  inset: 30px;
+  inset: 24px;
   border-radius: 999px;
   background: transparent;
   display: flex;
@@ -673,7 +677,7 @@
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-bottom: 11px solid #3a9bf6;
-  transform: translate(-50%, -50%) rotate(0deg) translateY(-96px);
+  transform: translate(-50%, -50%) rotate(0deg) translateY(var(--ldl-wind-arrow-radius));
   transform-origin: center center;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
 }
@@ -683,20 +687,42 @@
   letter-spacing: -0.001em;
   color: var(--text-soft);
   line-height: 0.82;
-  font-size: var(--text-sm);
+  font-size: var(--text-vs);
 }
 
 #ldl-current-wind-speed {
   font-weight: 400;
   line-height: 0.86;
   color: #eef5ff;
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
 }
 
 #ldl-current-wind-gusts {
-  font-size: var(--text-2xs);
+  font-size: 16pt;
   color: var(--text-soft);
   line-height: 1;
+}
+
+@container ldl-main (min-width: 1500px) {
+  #ldl-current {
+    gap: 24px;
+    padding-inline: 26px;
+  }
+
+  .ldl-current-summary-group {
+    flex-basis: 340px;
+  }
+
+  .ldl-current-details-group {
+    grid-template-columns: 200px repeat(5, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "wind dewpoint visibility uv humidity pressure";
+  }
+
+  #ldl-current-humidity,
+  #ldl-current-pressure {
+    border-top: 0;
+  }
 }
 
 /* LDL HOURLY */
@@ -1125,10 +1151,6 @@
   border: 0 !important;
 }
 
-.ldl-current-detail {
-  border: 0 !important;
-}
-
 .ldl-carousel-current,
 .ldl-carousel-location-entry {
   text-shadow: none;
@@ -1158,7 +1180,7 @@
 }
 
 .ldl-current-wind-ring {
-  border: 13px solid rgba(247, 251, 255, 0.82);
+  border: 11px solid rgba(247, 251, 255, 0.82);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
 }
 
@@ -1275,10 +1297,5 @@ body.performance-cached-glass #ldl-current .ldl-current-detail {
 
 body.performance-static-glass #ldl-current .ldl-current-summary-group,
 body.performance-cached-glass #ldl-current .ldl-current-summary-group {
-  border-right: 0 !important;
-}
-
-body.performance-static-glass #ldl-current .ldl-current-wind-direction-indicator,
-body.performance-cached-glass #ldl-current .ldl-current-wind-direction-indicator {
   border-right: 0 !important;
 }

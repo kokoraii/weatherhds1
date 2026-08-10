@@ -363,7 +363,7 @@ function appendLDLCurrent() {
     if (c.currentWindArrow) {
         lastWindAngle = windDirectionAngle
         c.currentWindArrow.style.transition = 'none'
-        c.currentWindArrow.style.transform = `translate(-50%, -50%) rotate(${windDirectionAngle - 330}deg) translateY(-108px)`
+        c.currentWindArrow.style.transform = `translate(-50%, -50%) rotate(${windDirectionAngle - 330}deg) translateY(var(--ldl-wind-arrow-radius))`
     }
 
     const windCompass = document.getElementById('ldl-current-wind-compass')
@@ -975,7 +975,7 @@ function startWindJiggle(arrow, ticksOuter, ticksInner, baseAngle) {
         const tickOffset = angle - baseAngle
 
         arrow.style.transition = 'none'
-        arrow.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateY(-108px)`
+        arrow.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateY(var(--ldl-wind-arrow-radius))`
         if (ticksOuter) { ticksOuter.style.transition = 'none'; ticksOuter.style.transform = `rotate(${tickOffset}deg)` }
         if (ticksInner) { ticksInner.style.transition = 'none'; ticksInner.style.transform = `rotate(${-tickOffset}deg)` }
 
@@ -1129,7 +1129,7 @@ const slideAnimations = {
         const WIND_EASE = 'cubic-bezier(0.34, 1.20, 0.64, 1)'
         setTimeout(() => {
             arrow.style.transition = `transform ${WIND_DUR} ${WIND_EASE}`
-            arrow.style.transform = `translate(-50%, -50%) rotate(${lastWindAngle}deg) translateY(-108px)`
+            arrow.style.transform = `translate(-50%, -50%) rotate(${lastWindAngle}deg) translateY(var(--ldl-wind-arrow-radius))`
             if (ticksOuter) {
                 ticksOuter.style.transition = `transform ${WIND_DUR} ${WIND_EASE}`
                 ticksOuter.style.transform = 'rotate(0deg)'
