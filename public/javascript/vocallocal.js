@@ -203,22 +203,70 @@ function toForecastDaypartText(value, referenceTime = new Date()) {
     const hour = referenceTime.getHours()
     const eveningOrNight = hour >= 18 || hour < 6
     if ((normalized === 'today' || normalized === 'this afternoon' || normalized === 'this evening') && eveningOrNight) {
-        return 'Tonight.'
+        return 'For Tonight.'
     }
     if (FORECAST_TONIGHT_ALIASES.has(normalized)) {
-        return 'Tonight.'
+        return 'For Tonight.'
     }
     if (FORECAST_SIMPLE_LABELS.has(normalized)) {
-        return `${toTitleWords(normalized)}.`
+        return `For ${toTitleWords(normalized)}.`
     }
     if (FORECAST_WEEKDAYS.has(normalized)) {
         return `On ${toTitleWords(normalized)}.`
     }
     const nightMatch = normalized.match(/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+night$/)
     if (nightMatch) {
-        return `${toTitleWords(nightMatch[1])} night.`
+        return `On ${toTitleWords(nightMatch[1])} night.`
     }
     return ''
+}
+
+function finiteNumber(value) {
+    if (value == null || value === '') return null
+    const number = Number(value)
+    return Number.isFinite(number) ? number : null
+}
+
+function forecastVerbosity() {
+    const configured = Number(config?.vocallocal?.verbosity?.forecast ?? 0)
+    return Number.isFinite(configured) ? Math.min(3, Math.max(0, Math.trunc(configured))) : 0
+}
+
+function forecastDetailsText(period, verbosity, temperatureUnit, windUnit) {
+    if (verbosity < 1) return ''
+
+    const parts = []
+    const condition = normalizeNarrationText(period?.condition)
+    if (condition) parts.push(`${condition}.`)
+
+    const temperature = finiteNumber(period?.temperature)
+    if (temperature != null) {
+        const isNight = String(period?.dayOrNight || '').toUpperCase() === 'N'
+            || /\b(night|tonight|overnight|evening)\b/i.test(normalizeText(period?.daypart))
+        const unit = temperatureUnit === '°F' ? 'Fahrenheit' : 'Celsius'
+        parts.push(`${isNight ? 'Low' : 'High'} of ${temperature} degrees ${unit}.`)
+    }
+
+    if (verbosity >= 2) {
+        const windSpeed = finiteNumber(period?.windSpeed)
+        if (windSpeed === 0) {
+            parts.push('Winds are calm.')
+        } else if (windSpeed != null) {
+            const direction = normalizeText(period?.windDirection)
+            const directionPhrase = direction ? ` from the ${direction}` : ''
+            const unitPhrase = windUnit ? ` ${windUnit}` : ''
+            parts.push(`Winds${directionPhrase} at ${windSpeed}${unitPhrase}.`)
+        }
+
+        const precipChance = finiteNumber(period?.precipChance)
+        if (precipChance === 0) {
+            parts.push('No precipitation expected.')
+        } else if (precipChance != null) {
+            parts.push(`A ${precipChance} percent chance of precipitation.`)
+        }
+    }
+
+    return parts.join(' ')
 }
 
 function expressiveVoice(language) {
@@ -301,60 +349,37 @@ export async function prefetchMainVocallocal(payload) {
     const currentNarration = normalizeNarrationText(payload?.currentNarration)
     const forecastNarrativeDay1 = normalizeNarrationText(payload?.forecastNarrativeDay1)
     const forecastNarrativeDay2 = normalizeNarrationText(payload?.forecastNarrativeDay2)
-    const forecastDayOneIntro = toForecastDaypartText(payload?.forecastDayOne, referenceTime)
-    const forecastDayTwoIntro = toForecastDaypartText(payload?.forecastDayTwo, referenceTime)
     const forecastShortTermPeriods = Array.isArray(payload?.forecastShortTermPeriods) ? payload.forecastShortTermPeriods : []
     const voice = payload?.voice || expressiveVoice(language)
 
-    const forecastShortTermRequests = []
-    const forecastShortTermPeriodRequests = []
-    for (const period of forecastShortTermPeriods) {
+    const verbosity = forecastVerbosity()
+    const periods = forecastShortTermPeriods.length > 0
+        ? forecastShortTermPeriods
+        : [
+            { daypart: payload?.forecastDayOne, narrative: forecastNarrativeDay1 },
+            { daypart: payload?.forecastDayTwo, narrative: forecastNarrativeDay2 },
+        ]
+    const forecastShortTermPeriodRequests = periods.map((period) => {
         const intro = toForecastDaypartText(period?.daypart, referenceTime)
         const narrative = normalizeNarrationText(period?.narrative)
-        const periodRequests = []
-        if (intro) {
-            const req = { language, section: 'forecast', text: intro, splitSentences: false, voice }
-            forecastShortTermRequests.push(req)
-            periodRequests.push(req)
-        }
-        if (narrative) {
-            const req = { language, section: 'forecast', text: narrative, splitSentences: true, voice }
-            forecastShortTermRequests.push(req)
-            periodRequests.push(req)
-        }
-        forecastShortTermPeriodRequests.push(periodRequests)
-    }
+        const details = forecastDetailsText(
+            period,
+            verbosity,
+            payload?.temperatureUnit,
+            payload?.windUnit,
+        )
+        const requests = []
 
-    if (forecastShortTermRequests.length === 0) {
-        const fallbackPeriodZero = []
-        if (forecastDayOneIntro) {
-            const req = { language, section: 'forecast', text: forecastDayOneIntro, splitSentences: false, voice }
-            forecastShortTermRequests.push(req)
-            fallbackPeriodZero.push(req)
+        if (intro) {
+            requests.push({ language, section: 'forecast', text: intro, splitSentences: false, voice })
         }
-        if (forecastNarrativeDay1) {
-            const req = { language, section: 'forecast', text: forecastNarrativeDay1, splitSentences: true, voice }
-            forecastShortTermRequests.push(req)
-            fallbackPeriodZero.push(req)
+        const spokenDetails = verbosity === 3 && narrative ? narrative : details
+        if (spokenDetails) {
+            requests.push({ language, section: 'forecast', text: spokenDetails, splitSentences: true, voice })
         }
-        const fallbackPeriodOne = []
-        if (forecastDayTwoIntro) {
-            const req = { language, section: 'forecast', text: forecastDayTwoIntro, splitSentences: false, voice }
-            forecastShortTermRequests.push(req)
-            fallbackPeriodOne.push(req)
-        }
-        if (forecastNarrativeDay2) {
-            const req = { language, section: 'forecast', text: forecastNarrativeDay2, splitSentences: true, voice }
-            forecastShortTermRequests.push(req)
-            fallbackPeriodOne.push(req)
-        }
-        if (fallbackPeriodZero.length > 0) {
-            forecastShortTermPeriodRequests.push(fallbackPeriodZero)
-        }
-        if (fallbackPeriodOne.length > 0) {
-            forecastShortTermPeriodRequests.push(fallbackPeriodOne)
-        }
-    }
+        return requests
+    })
+    const forecastShortTermRequests = forecastShortTermPeriodRequests.flat()
 
     const jobs = [
         queueSlideNarration('current', [

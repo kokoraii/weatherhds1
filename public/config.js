@@ -83,6 +83,15 @@ export let config = {
         "pitch": 3,
         "volume": 80
       },
+      "verbosity": {
+        "forecast": 1,
+        /* forecast verbosity:
+          0 - a simple "For Today, For Tonight, For Tomorrow, On Wednesday" phrase for the short term.
+          1 - add static condition and high/low phrases.
+          2 - add wind and/or precip phrases.
+          3 - read the entire forecast text narration.
+        */
+      },
       "blackout": { // disable vocallocals during this timerange. useful for when you have an IntelliStar 2 and you dont want the AI to disrupt Jim Cantore's beautiful voiceovers.
         "enabled": false,
         "timing": [
@@ -599,4 +608,4 @@ export const holidayMapping = {
 
 
 
-export const versionID = '26.10.23';
+export const versionID = '26.10.24';

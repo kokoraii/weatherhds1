@@ -38,6 +38,17 @@ function formatTemp(value) {
     return `${displayValue}<span class="small-degrees">${endingTemp}</span>`
 }
 
+function formatForecastPhrase(value) {
+    if (typeof value !== 'string') return ''
+
+    const sentence = value.trim()
+        .replace(/^AM\b/i, 'Morning')
+        .replace(/^PM\b/i, 'Afternoon')
+        .replace(/\/Wind\b/i, ', with wind')
+        .toLowerCase()
+    return sentence ? sentence[0].toUpperCase() + sentence.slice(1) : ''
+}
+
 function setWeatherBackground(el, cssVarName, url) {
     if (!el) return
     if (!url) {
@@ -299,6 +310,9 @@ export async function appendDatatoMain(locale, locType) {
                 const condition = daypartData?.wxPhraseLong?.[index]
                 const temperature = daypartData?.temperature?.[index]
                 const narrative = daypartData?.narrative?.[index]
+                const windDirection = daypartData?.windDirectionCardinal?.[index]
+                const windSpeed = daypartData?.windSpeed?.[index]
+                const precipChance = daypartData?.precipChance?.[index]
                 const iconCode = daypartData?.iconCode?.[index]
                 const dayOrNight = daypartData?.dayOrNight?.[index]
                 if (title == null && condition == null && temperature == null && narrative == null) {
@@ -308,7 +322,11 @@ export async function appendDatatoMain(locale, locType) {
                     title: title || '',
                     condition: condition || '',
                     temperature: formatTemp(temperature),
+                    temperatureValue: temperature,
                     narrative: narrative || '',
+                    windDirection: windDirection || '',
+                    windSpeed,
+                    precipChance,
                     iconCode,
                     dayOrNight: dayOrNight || 'D'
                 })
@@ -361,10 +379,18 @@ export async function appendDatatoMain(locale, locType) {
                     const forecastNarrativeDay2 = forecast?.daypart?.[0]?.narrative?.[2] ?? forecast?.daypart?.[0]?.narrative?.[3] ?? ''
                     const forecastShortTermPeriods = shortTermForecastPeriods.map((period) => ({
                         daypart: period.title,
+                        condition: period.condition,
+                        temperature: period.temperatureValue,
+                        dayOrNight: period.dayOrNight,
+                        windDirection: period.windDirection,
+                        windSpeed: period.windSpeed,
+                        precipChance: period.precipChance,
                         narrative: period.narrative,
                     }))
                     await prefetchMainVocallocal({
                         language: languageCode,
+                        temperatureUnit: endingTemp,
+                        windUnit: endingWind,
                         currentNarration,
                         forecastDayOne,
                         forecastDayTwo,
@@ -507,10 +533,10 @@ export async function appendDatatoMain(locale, locType) {
             "main-intraday-time2": formatTime(intraday[2].fcst_valid_local),
             "main-intraday-title3": intraday[3].daypart_name,
             "main-intraday-time3": formatTime(intraday[3].fcst_valid_local),
-            "main-intraday-condition0": intraday[0].phrase_22char,
-            "main-intraday-condition1": intraday[1].phrase_22char,
-            "main-intraday-condition2": intraday[2].phrase_22char,
-            "main-intraday-condition3": intraday[3].phrase_22char,
+            "main-intraday-condition0": formatForecastPhrase(intraday[0].phrase_22char),
+            "main-intraday-condition1": formatForecastPhrase(intraday[1].phrase_22char),
+            "main-intraday-condition2": formatForecastPhrase(intraday[2].phrase_22char),
+            "main-intraday-condition3": formatForecastPhrase(intraday[3].phrase_22char),
             "main-intraday-temp0": { html: formatTemp(intraday[0].temp) },
             "main-intraday-temp1": { html: formatTemp(intraday[1].temp) },
             "main-intraday-temp2": { html: formatTemp(intraday[2].temp) },
