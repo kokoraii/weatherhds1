@@ -286,7 +286,10 @@ func (s *Service) playOggOpusTrack(track Track) error {
 		return err
 	}
 	defer file.Close()
+	return s.playOggOpusReader(track, file)
+}
 
+func (s *Service) playOggOpusReader(track Track, reader io.Reader) error {
 	s.mu.Lock()
 	s.current = &track
 	s.startedAt = time.Now()
@@ -308,7 +311,7 @@ func (s *Service) playOggOpusTrack(track Track) error {
 			return nil
 		default:
 		}
-		packets, granule, err := readOggPackets(file, &pending)
+		packets, granule, err := readOggPackets(reader, &pending)
 		if errors.Is(err, io.EOF) {
 			return nil
 		}
@@ -393,7 +396,7 @@ func scanLibrary(root string) ([]Track, []string) {
 		}
 		ext := strings.ToLower(filepath.Ext(path))
 		if !isSupportedExtension(ext) {
-			if isCommonAudioExtension(ext) {
+			if isCommonMediaExtension(ext) {
 				unsupported = append(unsupported, path)
 			}
 			return nil
@@ -413,9 +416,10 @@ func isOggOpusExtension(ext string) bool {
 	return ext == ".ogg" || ext == ".opus"
 }
 
-func isCommonAudioExtension(ext string) bool {
+func isCommonMediaExtension(ext string) bool {
 	switch ext {
-	case ".mp3", ".m4a", ".aac", ".flac", ".wav", ".wave", ".oga", ".ogg", ".opus":
+	case ".mp3", ".m4a", ".m4b", ".m4p", ".aac", ".ac3", ".aif", ".aiff", ".alac", ".amr", ".ape", ".au", ".caf", ".dts", ".flac", ".mka", ".mpc", ".oga", ".ogg", ".opus", ".ra", ".wav", ".wave", ".wma", ".wv",
+		".3gp", ".asf", ".avi", ".dv", ".flv", ".m2ts", ".m2v", ".m4v", ".mkv", ".mov", ".mp4", ".mpe", ".mpeg", ".mpg", ".mts", ".mxf", ".nut", ".ogv", ".ts", ".vob", ".webm", ".wmv":
 		return true
 	default:
 		return false

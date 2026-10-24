@@ -395,7 +395,6 @@ import "C"
 
 import (
 	"fmt"
-	"path/filepath"
 	"time"
 	"unsafe"
 
@@ -403,12 +402,7 @@ import (
 )
 
 func isNativeAudioExtension(ext string) bool {
-	switch filepath.Ext("x" + ext) {
-	case ".mp3", ".m4a", ".aac", ".flac", ".wav", ".wave", ".oga":
-		return true
-	default:
-		return false
-	}
+	return isCommonMediaExtension(ext)
 }
 
 func unsupportedLibraryMessage() string {
