@@ -21,6 +21,7 @@ CACHE_VALID_TIME=720
 type RuntimePaths struct {
 	WorkspaceDir string
 	PublicDir    string
+	AdminDir     string
 	ConfigPath   string
 	EnvPath      string
 }
@@ -29,12 +30,19 @@ func ensureRuntimeFiles(workspaceDir string, embedded fs.FS) (RuntimePaths, erro
 	paths := RuntimePaths{
 		WorkspaceDir: workspaceDir,
 		PublicDir:    filepath.Join(workspaceDir, "public"),
-		ConfigPath:   filepath.Join(workspaceDir, "public", "config.js"),
+		AdminDir:     filepath.Join(workspaceDir, "admin"),
+		ConfigPath:  filepath.Join(workspaceDir, "public", "config.js"),
 		EnvPath:      filepath.Join(workspaceDir, ".env"),
 	}
 
 	if embedded != nil && !fileExists(paths.PublicDir) {
 		if err := extractEmbeddedDir(embedded, "public", paths.PublicDir); err != nil {
+			return RuntimePaths{}, err
+		}
+	}
+
+	if embedded != nil && !fileExists(paths.AdminDir) {
+		if err := extractEmbeddedDir(embedded, "admin", paths.AdminDir); err != nil {
 			return RuntimePaths{}, err
 		}
 	}

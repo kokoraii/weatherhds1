@@ -1,11 +1,11 @@
 import { weatherIcons, locationConfig, serverConfig, config, displayUnits } from "../config.js";
 import { requestWxData, requestAlertData } from "./data.js";
+import { weatherIconUrl } from "./icons.js";
 
 const SCROLL_SPEED_PX_PER_MS = 0.24;
 const STATIC_MSG_DURATION_MS = 12000;
-const TARGET_FRAME_MS = 1000 / Math.max(1, Number(config.performance?.cityTickerFps ?? 60));
 const FETCH_CONCURRENCY = Math.max(1, Number(config.performance?.cityTickerFetchConcurrency ?? 4));
-const iconDir = config.staticIcons ? "static" : "animated";
+const iconDir = config.staticIcons ? "static" : "smil";
 const units = displayUnits[serverConfig.units] ?? displayUnits["m"];
 
 function resolveIcon(iconCode, dayOrNight) {
@@ -40,7 +40,7 @@ function buildCurrentEntry(locationStr, current, alertData = null) {
 
     const icon = document.createElement("img");
     icon.className = "cityticker-entry-icon";
-    icon.src = `/graphics/${iconDir}/${resolveIcon(current.iconCode, current.dayOrNight)}`;
+    icon.src = weatherIconUrl(iconDir, resolveIcon(current.iconCode, current.dayOrNight));
 
     entry.append(city, temp, cond, icon);
     return entry;
@@ -80,7 +80,7 @@ function buildForecastEntry(locationStr, forecast, dayIndex, hasAlert = false) {
 
     const icon = document.createElement("img");
     icon.className = "cityticker-entry-icon";
-    icon.src = `/graphics/${iconDir}/${resolveIcon(iconCode, "D")}`;
+    icon.src = weatherIconUrl(iconDir, resolveIcon(iconCode, "D"));
 
     entry.append(city, temps, condEl, icon);
     return entry;
@@ -298,23 +298,18 @@ function buildQueue(byProduct, products, messages, cycleCount) {
     return queue;
 }
 
+// Every scroll below is a constant-speed linear move, so it is handed to the browser as a Web Animation.
+// Those run on the compositor at the display's refresh rate even when the main thread is busy, which a
+// requestAnimationFrame loop cannot promise on weak hardware.
 class CityTickerScroller {
-    #raf = null;
     #queueIndex = 0;
     #cycleCount = 1;
     #queue = [];
 
-    #trackOffset = 0;
-    #trackWidth = 0;
-    #entriesEl = null;
-    #entriesWidth = 0;
-    #headerWidth = 0;
-    #entryOffset = 0;
-    #lastTimestamp = null;
-    #lastPaintTimestamp = null;
-
-    #state = "idle";
-    #staticStart = null;
+    #running = false;
+    #runId = 0;
+    #animations = [];
+    #wake = null;
 
     constructor(viewport, track, byProduct, products, messages) {
         this.viewport = viewport;
@@ -322,14 +317,6 @@ class CityTickerScroller {
         this.byProduct = byProduct;
         this.products = products;
         this.messages = messages;
-    }
-
-    #setTrackX(x) {
-        this.track.style.transform = `translate3d(${x}px, 0, 0)`;
-    }
-
-    #setEntriesX(x) {
-        if (this.#entriesEl) this.#entriesEl.style.transform = `translate3d(${x}px, 0, 0)`;
     }
 
     #rebuildQueue() {
@@ -343,123 +330,93 @@ class CityTickerScroller {
             this.#cycleCount++;
             this.#rebuildQueue();
         }
-        this.#loadCurrent();
     }
 
-    #loadCurrent() {
-        const seg = this.#queue[this.#queueIndex];
-        if (!seg) return;
+    #slide(el, from, to) {
+        const animation = el.animate(
+            [{ transform: `translate3d(${from}px, 0, 0)` }, { transform: `translate3d(${to}px, 0, 0)` }],
+            { duration: Math.abs(from - to) / SCROLL_SPEED_PX_PER_MS, easing: "linear", fill: "forwards" }
+        );
+        this.#animations.push(animation);
+        return animation.finished;
+    }
 
+    #sleep(ms) {
+        return new Promise(resolve => {
+            const timer = setTimeout(resolve, ms);
+            this.#wake = () => { clearTimeout(timer); resolve(); };
+        });
+    }
+
+    #cancelAnimations() {
+        for (const animation of this.#animations) animation.cancel();
+        this.#animations = [];
+    }
+
+    async #play(seg) {
+        this.#cancelAnimations();
         this.track.innerHTML = "";
-        this.#entriesEl = null;
 
+        let header = null;
+        let entries;
         if (seg.type === "entries") {
-            const header = document.createElement("div");
+            header = document.createElement("div");
             header.className = "cityticker-header";
             header.textContent = seg.headerText;
 
-            const entries = document.createElement("div");
+            entries = document.createElement("div");
             entries.className = "cityticker-entries";
             for (const node of seg.entries) entries.appendChild(node.cloneNode(true));
 
             this.track.append(header, entries);
-            this.#headerWidth = header.offsetWidth;
-            this.#entriesEl = entries;
-            this.#entriesWidth = entries.scrollWidth;
-        } else if (seg.type === "message") {
-            const { header, body } = buildMessageNodes(seg.msg);
+        } else {
+            const nodes = buildMessageNodes(seg.msg);
+            header = nodes.header;
+            entries = nodes.body;
             if (header) this.track.append(header);
-            this.track.append(body);
-            this.#headerWidth = header ? header.offsetWidth : 0;
-            this.#entriesEl = body;
-            this.#entriesWidth = body.scrollWidth;
+            this.track.append(entries);
+        }
+        const headerWidth = header ? header.offsetWidth : 0;
+        const entriesWidth = entries.scrollWidth;
 
-            if (!seg.msg.scroll) {
-                this.#lastTimestamp = null;
-                this.#lastPaintTimestamp = null;
-                this.#state = "static";
-                this.#staticStart = null;
-                this.#setTrackX(0);
-                this.#setEntriesX(0);
-                return;
-            }
+        if (seg.type === "message" && !seg.msg.scroll) {
+            await this.#sleep(STATIC_MSG_DURATION_MS);
+            return;
         }
-        const vpWidth = this.viewport.offsetWidth;
-        this.#trackOffset = vpWidth;
-        this.#entryOffset = 0;
-        this.#lastTimestamp = null;
-        this.#lastPaintTimestamp = null;
-        this.#setTrackX(vpWidth);
-        if (this.#entriesEl) {
-            this.#entriesEl.style.marginLeft = "0px";
-            this.#setEntriesX(0);
-        }
-        this.#state = "scrolling";
+
+        entries.style.marginLeft = "0px";
+        // The whole track slides in from the right edge, the entries then scroll past the header, and
+        // finally the header leaves on its own.
+        await this.#slide(this.track, this.viewport.offsetWidth, 0);
+        await this.#slide(entries, 0, -(headerWidth + entriesWidth));
+        await this.#slide(this.track, 0, -headerWidth);
     }
 
-    #tick(timestamp) {
-        const seg = this.#queue[this.#queueIndex];
-        if (!seg) {
-            this.#raf = requestAnimationFrame(ts => this.#tick(ts));
-            return;
-        }
-
-        if (this.#lastPaintTimestamp !== null && timestamp - this.#lastPaintTimestamp < TARGET_FRAME_MS) {
-            this.#raf = requestAnimationFrame(ts => this.#tick(ts));
-            return;
-        }
-        this.#lastPaintTimestamp = timestamp;
-
-        if (this.#state === "scrolling") {
-            const delta = this.#lastTimestamp === null ? 0 : timestamp - this.#lastTimestamp;
-            this.#lastTimestamp = timestamp;
-            this.#trackOffset -= SCROLL_SPEED_PX_PER_MS * delta;
-            this.#setTrackX(this.#trackOffset);
-
-            if (this.#trackOffset <= 0) {
-                this.#entryOffset = 0;
-                this.#lastTimestamp = null;
-                this.#state = "held";
+    async #run(runId) {
+        while (this.#running && runId === this.#runId && this.#queue[this.#queueIndex]) {
+            try {
+                await this.#play(this.#queue[this.#queueIndex]);
+            } catch (error) {
+                if (error?.name === "AbortError") return;
+                throw error;
             }
-
-        } else if (this.#state === "held" && this.#entriesEl) {
-            const delta = this.#lastTimestamp === null ? 0 : timestamp - this.#lastTimestamp;
-            this.#lastTimestamp = timestamp;
-            this.#entryOffset -= SCROLL_SPEED_PX_PER_MS * delta;
-            this.#setEntriesX(this.#entryOffset);
-
-            const rightEdge = this.#trackOffset + this.#headerWidth + this.#entryOffset + this.#entriesWidth;
-            if (rightEdge <= 0) {
-                this.#lastTimestamp = null;
-                this.#state = "exiting";
-            }
-
-        } else if (this.#state === "exiting") {
-            const delta = this.#lastTimestamp === null ? 0 : timestamp - this.#lastTimestamp;
-            this.#lastTimestamp = timestamp;
-            this.#trackOffset -= SCROLL_SPEED_PX_PER_MS * delta;
-            this.#setTrackX(this.#trackOffset);
-
-            if (this.#trackOffset + this.#headerWidth <= 0) this.#advance();
-
-        } else if (this.#state === "static") {
-            if (this.#staticStart === null) this.#staticStart = timestamp;
-            if (timestamp - this.#staticStart >= STATIC_MSG_DURATION_MS) this.#advance();
+            if (runId !== this.#runId) return;
+            this.#advance();
         }
-
-        this.#raf = requestAnimationFrame(ts => this.#tick(ts));
     }
 
     start() {
-        if (this.#raf) return;
+        if (this.#running) return;
+        this.#running = true;
         this.#rebuildQueue();
-        this.#loadCurrent();
-        this.#raf = requestAnimationFrame(ts => this.#tick(ts));
+        this.#run(++this.#runId);
     }
 
     stop() {
-        if (this.#raf) cancelAnimationFrame(this.#raf);
-        this.#raf = null;
+        this.#running = false;
+        this.#runId++;
+        this.#cancelAnimations();
+        this.#wake?.();
     }
 }
 

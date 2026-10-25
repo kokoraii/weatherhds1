@@ -8,7 +8,7 @@ import (
 	"weatherhds/internal/server"
 )
 
-//go:embed public
+//go:embed public admin
 var embeddedWebroot embed.FS
 
 func main() {

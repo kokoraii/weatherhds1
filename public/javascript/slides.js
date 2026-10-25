@@ -4,6 +4,7 @@ import { serverHealth } from "./data.js";
 import { runRegionalPlayback } from "./national.js";
 import { resizeRadar } from "./radar.js";
 import { getVocallocalQueueForSlide, getVocallocalTotalDurationMsForSlide, isVocallocalEnabled } from "./vocallocal.js";
+import { startMarquee, stopMarquee } from "./marquee.js";
 
 const playlistSettings = {
     defaultAnimationIn: `mainPresentationSlideIn 500ms ease-in-out`,
@@ -1262,12 +1263,7 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
         const marquee = domCache.regionalBumperSubtext;
         const networkName = brand?.networkName || config?.networkName || 'METEOchannel';
         marquee.innerText = ` ${networkName} `.repeat(50);
-        $(document).ready(function(){
-            $('#national-bumper-subtext').marquee({
-                duration: 9000, gap: 360, delayBeforeStart: 0,
-                direction: 'left', duplicated: true, pauseOnHover: true,
-            });
-        });
+        startMarquee(marquee, { duration: 9000, gap: 360, delayBeforeStart: 0, duplicated: true, pauseOnHover: true });
 
         const randomBackgrounds = bumperBackgroundsRandom.national;
         if (randomBackgrounds?.length) {
@@ -1307,9 +1303,7 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
                 domCache.regionalBumperSubtext.style.animation = 'fadeModule 1500ms linear forwards';
             });
         }, def.duration - 1000);
-        setTimeout(() => {
-            $(document).ready(function(){ $('#national-bumper-subtext').marquee('destroy'); });
-        }, def.duration);
+        setTimeout(() => stopMarquee(domCache.regionalBumperSubtext), def.duration);
     }
 
     slideNearEnd = setTimeout(() => {

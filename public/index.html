@@ -11,10 +11,12 @@
         <link rel="stylesheet" href="/css/cityticker.css">
         <link rel="stylesheet" href="/css/ldl.css">
         <link rel="stylesheet" href="/css/animations.css">
+        <link rel="stylesheet" href="/css/marquee.css">
         <link rel="icon" type="image/x-icon" href="/images/favicon.png">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
-        <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-        <script src="//cdn.jsdelivr.net/npm/jquery.marquee@1.6.0/jquery.marquee.min.js" type="text/javascript"></script>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
         <script type="module" src="javascript/weather.js" defer></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
         <script type="module" src="javascript/slides.js?v=upnext-2" defer></script>
@@ -58,7 +60,7 @@
                                 <div class="sidebar-conditions-temp" id="sidebar-conditions-temp">--</div>
                                 <div class="sidebar-conditions-phrase" id="sidebar-conditions-phrase">--</div>
                             </div>
-                            <img class="sidebar-conditions-icon" id="sidebar-conditions-icon" src="/graphics/animated/not-available.svg" alt="">
+                            <img class="sidebar-conditions-icon" id="sidebar-conditions-icon" src="/graphics/smil/not-available.svg" alt="">
                         </div>
                         <div class="sidebar-conditions-footer">
                             <div class="sidebar-summary-terminal" id="sidebar-summary-lines"></div>
@@ -210,7 +212,7 @@
                                     <div id="current-background" class="main-current-leftcontainer">
                                         <div id="main-current-box-filter">
                                             <div id="main-current-condition">No Data</div>
-                                            <img src="/graphics/animated/not-available.svg" id="main-current-icon">
+                                            <img src="/graphics/smil/not-available.svg" id="main-current-icon">
                                             <div id="main-current-temp">--°C</div>     
                                         </div>
                                     </div>
@@ -221,7 +223,7 @@
 
                                                 <div class="main-current-boxlabel" id="main-current-windlabel">Wind</div>
                                                 <div class="main-current-icon-container">
-                                                    <img src="/graphics/animated/not-available.svg" id="main-current-windicon">
+                                                    <img src="/graphics/smil/not-available.svg" id="main-current-windicon">
                                                 </div>
                                                 <div id="main-current-windvalue">W, 12 km/h</div>
                                                 <div id="main-current-windvalue-gust">Gusting to 512km/h</div>
@@ -231,7 +233,7 @@
 
                                                 <div class="main-current-boxlabel" id="main-current-feelslikelabel">Feels Like</div>
                                                 <div class="main-current-icon-container">
-                                                    <img src="/graphics/animated/not-available.svg" id="main-current-feelslikeicon">
+                                                    <img src="/graphics/smil/not-available.svg" id="main-current-feelslikeicon">
                                                 </div>
                                                 <div id="main-current-feelslikevalue">hi</div>
 
@@ -239,11 +241,11 @@
                                             <div class="main-current-condtions-box">
                                                 <div class="main-current-boxlabel" id="main-current-sunlabel">Sunrise & Sunset</div>
                                                 <div class="main-current-sunrisesunset-container">
-                                                    <img class="main-current-sunicon" src="/graphics/animated/sunrise.svg">
+                                                    <img class="main-current-sunicon" src="/graphics/smil/sunrise.svg">
                                                     <div id="main-current-sunrise-value">9:00a</div>
                                                 </div>
                                                 <div class="main-current-sunrisesunset-container">
-                                                    <img class="main-current-sunicon" src="/graphics/animated/sunset.svg">
+                                                    <img class="main-current-sunicon" src="/graphics/smil/sunset.svg">
                                                     <div id="main-current-sunset-value">9:00p</div>
                                                 </div>
                                             </div>
@@ -305,7 +307,7 @@
                                             <div class="main-intraday-time" id="main-intraday-time0"></div>
                                         </div>
                                         <div class="main-intraday-period-condition" id="main-intraday-condition0">Mostly Sunny</div>
-                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon0" src="/graphics/animated/extreme-day-rain.svg">
+                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon0" src="/graphics/smil/extreme-day-rain.svg">
                                         
                                         <div class="main-intraday-temp-slider-container">
                                             <div class="main-intraday-period-temp" id="main-intraday-temp0">36</div>
@@ -319,7 +321,7 @@
                                             <div id="main-intraday-title1"></div>
                                             <div class="main-intraday-time" id="main-intraday-time1"></div></div>
                                         <div class="main-intraday-period-condition" id="main-intraday-condition1">i love you laura, you will be missed, by me, until the day we meet again (no she is not dead)</div>
-                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon1" src="/graphics/animated/extreme-day-rain.svg">
+                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon1" src="/graphics/smil/extreme-day-rain.svg">
                                         
                                         <div class="main-intraday-temp-slider-container">
                                             <div class="main-intraday-period-temp" id="main-intraday-temp1">36</div>
@@ -334,7 +336,7 @@
                                             <div class="main-intraday-time" id="main-intraday-time2"></div>
                                         </div>
                                         <div class="main-intraday-period-condition" id="main-intraday-condition2">fgsdfgs</div>
-                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon2" src="/graphics/animated/extreme-day-rain.svg">
+                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon2" src="/graphics/smil/extreme-day-rain.svg">
                                         
                                         <div class="main-intraday-temp-slider-container">
                                             <div class="main-intraday-period-temp" id="main-intraday-temp2">36</div>
@@ -349,7 +351,7 @@
                                             <div class="main-intraday-time" id="main-intraday-time3"></div>
                                         </div>
                                         <div class="main-intraday-period-condition" id="main-intraday-condition3">fgsdfgs</div>
-                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon3" src="/graphics/animated/extreme-day-rain.svg">
+                                        <img class="forecast-shortterm-icon intradayicon" id="main-intraday-icon3" src="/graphics/smil/extreme-day-rain.svg">
                                         
                                         <div class="main-intraday-temp-slider-container">
                                             <div class="main-intraday-period-temp" id="main-intraday-temp3">36</div>
@@ -365,7 +367,7 @@
                                 <div class="main-shortterm-slide-container" id="forecast-shortterm-content">
                                     <div class="forecast-shortterm-summary main-slide-panel" id="forecast-shortterm-summary">
                                         <div class="forecast-shortterm-title" id="forecast-shortterm-title"></div>
-                                        <img class="forecast-shortterm-icon" src="/graphics/animated/not-available.svg" id="main-forecast-shortterm-icon">
+                                        <img class="forecast-shortterm-icon" src="/graphics/smil/not-available.svg" id="main-forecast-shortterm-icon">
                                         <div class="forecast-shortterm-condition" id="forecast-shortterm-condition"></div>
                                         <div class="forecast-shortterm-temp" id="forecast-shortterm-temp"></div>
                                     </div>
@@ -378,7 +380,7 @@
                                     <div class="main-forecast-day main-slide-panel">
                                         <div id="forecast-day3-title" class="main-forecast-title">TODAY</div>
                                         <div id="forecast-day3-condition" class="main-forecast-condition"></div>
-                                        <img id="forecast-day3-icon" class="main-forecast-icon" src="/graphics/animated/not-available.svg">
+                                        <img id="forecast-day3-icon" class="main-forecast-icon" src="/graphics/smil/not-available.svg">
                                         <div class="main-forecast-temp-labels">
                                             <p>HIGH</p>
                                             <p>LOW</p>
@@ -396,7 +398,7 @@
                                     <div class="main-forecast-day main-slide-panel">
                                         <div id="forecast-day4-title" class="main-forecast-title">TODAY</div>
                                         <div id="forecast-day4-condition" class="main-forecast-condition"></div>
-                                        <img id="forecast-day4-icon" class="main-forecast-icon" src="/graphics/animated/not-available.svg">
+                                        <img id="forecast-day4-icon" class="main-forecast-icon" src="/graphics/smil/not-available.svg">
                                         <div class="main-forecast-temp-labels">
                                             <p>HIGH</p>
                                             <p>LOW</p>
@@ -414,7 +416,7 @@
                                     <div class="main-forecast-day main-slide-panel">
                                         <div id="forecast-day5-title" class="main-forecast-title">TODAY</div>
                                         <div id="forecast-day5-condition" class="main-forecast-condition"></div>
-                                        <img id="forecast-day5-icon" class="main-forecast-icon" src="/graphics/animated/not-available.svg">
+                                        <img id="forecast-day5-icon" class="main-forecast-icon" src="/graphics/smil/not-available.svg">
                                         <div class="main-forecast-temp-labels">
                                             <p>HIGH</p>
                                             <p>LOW</p>
@@ -432,7 +434,7 @@
                                     <div class="main-forecast-day main-slide-panel">
                                         <div id="forecast-day6-title" class="main-forecast-title">TODAY</div>
                                         <div id="forecast-day6-condition" class="main-forecast-condition"></div>
-                                        <img id="forecast-day6-icon" class="main-forecast-icon" src="/graphics/animated/not-available.svg">
+                                        <img id="forecast-day6-icon" class="main-forecast-icon" src="/graphics/smil/not-available.svg">
                                         <div class="main-forecast-temp-labels">
                                             <p>HIGH</p>
                                             <p>LOW</p>
@@ -450,7 +452,7 @@
                                     <div class="main-forecast-day main-slide-panel">
                                         <div id="forecast-day7-title" class="main-forecast-title">TODAY</div>
                                         <div id="forecast-day7-condition" class="main-forecast-condition"></div>
-                                        <img id="forecast-day7-icon" class="main-forecast-icon" src="/graphics/animated/not-available.svg">
+                                        <img id="forecast-day7-icon" class="main-forecast-icon" src="/graphics/smil/not-available.svg">
                                         <div class="main-forecast-temp-labels">
                                             <p>HIGH</p>
                                             <p>LOW</p>
@@ -519,7 +521,7 @@
                                             <div class="national-location-name" id="national-current-location-name1">Saskatoon</div>
                                             <div class="national-location-temp" id="national-current-location-temp1">12°C</div>
                                             <div class="national-location-condition" id="national-current-location-condition1">Partly Cloudy</div>
-                                            <img class="national-location-icon" id="national-current-location-icon1" src="/graphics/animated/partly-cloudy-day-rain.svg">
+                                            <img class="national-location-icon" id="national-current-location-icon1" src="/graphics/smil/partly-cloudy-day-rain.svg">
                                         </div>
                                     </div>
                                 </div>
@@ -536,7 +538,7 @@
                                             <div class="national-location-temp" id="national-forecast1-location-hightemp1">12°</div>
                                             <div class="national-location-temp" id="national-forecast1-location-lowtemp1">-12°</div>
                                             <div class="national-location-condition" id="national-forecast1-location-condition1">Partly Cloudy</div>
-                                            <img class="national-location-icon" id="national-forecast1-location-icon1" src="/graphics/animated/partly-cloudy-day-rain.svg">
+                                            <img class="national-location-icon" id="national-forecast1-location-icon1" src="/graphics/smil/partly-cloudy-day-rain.svg">
                                         </div>
                                     </div>
                                 </div>
@@ -553,7 +555,7 @@
                                             <div class="national-location-temp" id="national-forecast2-location-hightemp1">12°</div>
                                             <div class="national-location-temp" id="national-forecast2-location-lowtemp1">-12°</div>
                                             <div class="national-location-condition" id="national-forecast2-location-condition1">Partly Cloudy</div>
-                                            <img class="national-location-icon" id="national-forecast2-location-icon1" src="/graphics/animated/partly-cloudy-day-rain.svg">
+                                            <img class="national-location-icon" id="national-forecast2-location-icon1" src="/graphics/smil/partly-cloudy-day-rain.svg">
                                         </div>
                                     </div>
                                 </div>
@@ -612,7 +614,7 @@
                             </div>
                             <div class="ldl-slide" id="ldl-current">
                                 <div class="ldl-current-summary-group"> <!-- display name "Now" on the carousel -->
-                                    <img id="ldl-current-icon" class="ldl-current-icon" src="/graphics/animated/not-available.svg">
+                                    <img id="ldl-current-icon" class="ldl-current-icon" src="/graphics/smil/not-available.svg">
                                     <span class="ldl-current-summary-texts">
                                         <div id="ldl-current-condition" class="ldl-current-condition">No Data</div>
                                         <div id="ldl-current-temp" class="ldl-current-temp">64<span class="ldl-small-degrees">°C</span></div>
@@ -666,43 +668,43 @@
                                 <div class="ldl-hourly-forecast-container" id="ldl-hourly-forecast-container">
                                     <div class="ldl-hourly-period">
                                         <div class="ldl-hourly-time" id="ldl-hourly-time0">This hour</div>
-                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon0" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon0" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-hourly-temp" id="ldl-hourly-temp0">98<span class="ldl-small-degrees">°C</span></div>
                                         <div class="ldl-hourly-condition" id="ldl-hourly-condition0">Mainly Stupid</div>
                                     </div>
                                     <div class="ldl-hourly-period">
                                         <div class="ldl-hourly-time" id="ldl-hourly-time1">12 AM</div>
-                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon1" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon1" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-hourly-temp" id="ldl-hourly-temp1">--<span class="ldl-small-degrees">°C</span></div>
                                         <div class="ldl-hourly-condition" id="ldl-hourly-condition1">Mainly Stupid</div>
                                     </div>
                                     <div class="ldl-hourly-period">
                                         <div class="ldl-hourly-time" id="ldl-hourly-time2">1 AM</div>
-                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon2" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon2" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-hourly-temp" id="ldl-hourly-temp2"><span class="temp-point point-highest">🡅</span>143<span class="ldl-small-degrees">°C</span></div> <!-- highest/lowest for this day or night -->
                                         <div class="ldl-hourly-condition" id="ldl-hourly-condition2">Mainly Stupid</div>
                                     </div>
                                     <div class="ldl-hourly-period">
                                         <div class="ldl-hourly-time" id="ldl-hourly-time3">2 AM</div>
-                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon3" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon3" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-hourly-temp" id="ldl-hourly-temp3">--<span class="ldl-small-degrees">°C</span></div>
                                         <div class="ldl-hourly-condition" id="ldl-hourly-condition3">Mainly Stupid</div>
                                     </div>
                                     <div class="ldl-hourly-period">
                                         <div class="ldl-hourly-time" id="ldl-hourly-time4">2 AM</div>
-                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon4" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon4" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-hourly-temp" id="ldl-hourly-temp4"><span class="temp-point point-lowest">🡇</span>--<span class="ldl-small-degrees">°C</span></div>
                                         <div class="ldl-hourly-condition" id="ldl-hourly-condition4">Mainly Stupid</div>
                                     </div>
                                     <div class="ldl-hourly-period">
                                         <div class="ldl-hourly-time" id="ldl-hourly-time5">2 AM</div>
-                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon5" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon5" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-hourly-temp" id="ldl-hourly-temp5">--<span class="ldl-small-degrees">°C</span></div>
                                         <div class="ldl-hourly-condition" id="ldl-hourly-condition5">Mainly Stupid</div>
                                     </div>
                                     <div class="ldl-hourly-period">
                                         <div class="ldl-hourly-time" id="ldl-hourly-time6">2 AM</div>
-                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon6" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-hourly-icon" id="ldl-hourly-icon6" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-hourly-temp" id="ldl-hourly-temp6">--<span class="ldl-small-degrees">°C</span></div>
                                         <div class="ldl-hourly-condition" id="ldl-hourly-condition6">Mainly Stupid</div>
                                     </div>
@@ -741,7 +743,7 @@
                             <div class="ldl-slide" id="ldl-shortterm"> <!-- display name "Next 48 Hours"-->
                                 <div class="ldl-shortterm-forecast-container" id="ldl-shortterm-forecast-container"> <!-- also dynamically build this for 4 periods and flip through each period as pages-->
                                     <div class="ldl-shortterm-period-summary">
-                                        <img class="ldl-shortterm-icon" id="ldl-shortterm-period-icon0" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-shortterm-icon" id="ldl-shortterm-period-icon0" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-shortterm-period-temp" id="ldl-shortterm-period-temp0">12<span class="ldl-small-degrees">°C</span></div>
                                         <div class="ldl-shortterm-pop" id="ldl-shortterm-period-pop0">20% Precip.</div> <!-- only show if not zero -->
                                     </div>
@@ -762,7 +764,7 @@
                                 <div class="ldl-daily-forecast-container" id="ldl-daily-forecast-container"> <!-- dynamically build this for 7 periods lined up horizontally. -->
                                     <div class="ldl-daily-period-summary">
                                         <div class="ldl-daily-period-title" id="ldl-daily-period-title0">WED</div>
-                                        <img class="ldl-daily-icon" id="ldl-daily-period-icon0" src="/graphics/animated/not-available.svg">
+                                        <img class="ldl-daily-icon" id="ldl-daily-period-icon0" src="/graphics/smil/not-available.svg">
                                         <div class="ldl-daily-period-condition" id="ldl-daily-period-condition0">Partly Cloudy</div>
                                         <div class="ldl-daily-period-high" id="ldl-daily-period-high0">12°</div> <!-- color orange below icon-->
                                         <div class="ldl-daily-period-low" id="ldl-daily-period-low0">-12°</div> <!-- color blue, below high temperature slotted down in between periods.-->

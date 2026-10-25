@@ -1,0 +1,1 @@
+vibecoded helper scripts CUZ im lazy GG FRICKIN EZ

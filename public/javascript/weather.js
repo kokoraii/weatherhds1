@@ -2,6 +2,7 @@ import { requestWxData, serverHealth } from './data.js'
 import { weatherIcons, locationConfig, serverConfig, config, displayUnits } from "../config.js";
 import { drawMap } from './radar.js';
 import { isVocallocalEnabled, prefetchMainVocallocal } from './vocallocal.js'
+import { weatherIconUrl } from './icons.js'
 
 export const upNextLocationText = document.getElementById('upnext-location');
 export const currentLocationText = document.getElementById('current-location');
@@ -20,7 +21,7 @@ function getCachedElement(id) {
     return domCache.get(id);
 }
 const logTheFrickinTime = `[weather.js] | ${new Date().toLocaleString()} |`;
-let iconDir = "animated"
+let iconDir = "smil"
 
 const selectedDisplayUnits = displayUnits[serverConfig.units] || displayUnits['m'];
 let endingTemp = selectedDisplayUnits.endingTemp, endingWind = selectedDisplayUnits.endingWind, endingDistance = selectedDisplayUnits.endingDistance, endingPressure = selectedDisplayUnits.endingPressure, endingCeiling = selectedDisplayUnits.endingCeiling;
@@ -171,7 +172,7 @@ export function renderShortTermPeriod(periodIndex, animate = false) {
     }
     if (iconEl) {
         const iconPath = getIconPath(period.iconCode, period.dayOrNight)
-        iconEl.src = `/graphics/${iconDir}/${iconPath}`
+        iconEl.src = weatherIconUrl(iconDir, iconPath)
     }
     if (summaryEl) {
         const avifPath = getAvifPath(period.iconCode)
@@ -266,13 +267,12 @@ export function formatTime(timeString) {
 export function appendTextContent(dataMap) {
     requestAnimationFrame(() => {
         const entries = Object.entries(dataMap);
-        const iconPrefix = `/graphics/${iconDir}/`;
         for (let i = 0; i < entries.length; i++) {
             const [id, value] = entries[i];
             const el = getCachedElement(id);
             if (!el) continue;
             if (id.includes('icon')) {
-                el.src = iconPrefix + value;
+                el.src = weatherIconUrl(iconDir, value);
             } else if (value && typeof value === 'object' && 'html' in value) {
                 el.innerHTML = value.html;
             } else {
@@ -425,14 +425,14 @@ export async function appendDatatoMain(locale, locType) {
 
                     iconCode = intraday[daypartIndex].icon_code;
                     iconPath = weatherIcons[iconCode] ? weatherIcons[iconCode][dayOrNight === "D" ? 0 : 1] : 'not-available.svg';
-                    day.src = `/graphics/${iconDir}/${iconPath}`;
+                    day.src = weatherIconUrl(iconDir, iconPath);
                     return iconCode;
             case "forecast":
                 default:
                     iconCode = forecast.daypart[0].iconCode[daypartIndex];
                     dayOrNight = forecast.daypart[0].dayOrNight[daypartIndex];
                     iconPath = weatherIcons[iconCode] ? weatherIcons[iconCode][dayOrNight === "D" ? 0 : 1] : 'not-available.svg';
-                    day.src = `/graphics/${iconDir}/${iconPath}`;
+                    day.src = weatherIconUrl(iconDir, iconPath);
                     return iconCode;
             case "fcVideoBack":
                     iconCode = forecast.daypart[0].iconCode[daypartIndex];
@@ -454,7 +454,7 @@ export async function appendDatatoMain(locale, locType) {
         const wxImgRoot = weatherIcons[current.iconCode] || null
         const iconPath = wxImgRoot ? weatherIcons[current.iconCode][current.dayorNight === "D" ? 0 : 1] : 'not-available.svg'
         const avifPath = wxImgRoot && wxImgRoot[2]? `/images/avif/${wxImgRoot[2]}`: null;
-        currentIcon.src = `/graphics/${iconDir}/${iconPath}`
+        currentIcon.src = weatherIconUrl(iconDir, iconPath)
 
         if (config.videoBackgrounds === true) {
             setWeatherBackground(vidBack, '--current-weather-bg', avifPath)
@@ -464,10 +464,10 @@ export async function appendDatatoMain(locale, locType) {
 
         if (current.windGust === null) {
             gustValue.innerHTML = ``
-            windIcon.src = `/graphics/${iconDir}/windsock-weak.svg`
+            windIcon.src = weatherIconUrl(iconDir, "windsock-weak.svg")
         } else {
             gustValue.innerHTML = `Gusting to ${current.windGust}${endingWind}`
-            windIcon.src = `/graphics/${iconDir}/windsock.svg`
+            windIcon.src = weatherIconUrl(iconDir, "windsock.svg")
         }
 
         if (current.uvIndex === 0) {
@@ -501,22 +501,22 @@ export async function appendDatatoMain(locale, locType) {
 
         if (units == "m") {
             if (current.temperatureFeelsLike < 0) {
-                feelsLikeIcon.src = `/graphics/${iconDir}/thermometer-colder.svg`
+                feelsLikeIcon.src = weatherIconUrl(iconDir, "thermometer-colder.svg")
             } else {
-                feelsLikeIcon.src = `/graphics/${iconDir}/thermometer.svg`
+                feelsLikeIcon.src = weatherIconUrl(iconDir, "thermometer.svg")
             }
                     } else {
                         if (current.temperatureFeelsLike < 0) {
-                            feelsLikeIcon.src = `/graphics/${iconDir}/thermometer-colder.svg`
+                            feelsLikeIcon.src = weatherIconUrl(iconDir, "thermometer-colder.svg")
                         } else {
-                            feelsLikeIcon.src = `/graphics/${iconDir}/thermometer.svg`
+                            feelsLikeIcon.src = weatherIconUrl(iconDir, "thermometer.svg")
                         }
                     }
                     if (units == "e") {
                         if (current.temperatureFeelsLike < 32) {
-                            feelsLikeIcon.src = `/graphics/${iconDir}/thermometer-colder.svg`
+                            feelsLikeIcon.src = weatherIconUrl(iconDir, "thermometer-colder.svg")
                         } else {
-                            feelsLikeIcon.src = `/graphics/${iconDir}/thermometer.svg`
+                            feelsLikeIcon.src = weatherIconUrl(iconDir, "thermometer.svg")
                         }
                     }
 

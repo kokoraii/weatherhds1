@@ -44,6 +44,7 @@ export let config = {
     "videoBackgrounds": true, // enables or disables the video backgrounds on the current conditions slide.
     "currentConditionsGradient": true, // current conditions gradient based on current time relative to sunrise or sunset.
     "staticIcons": false, // would you like icons that dont move?
+    "animatedIconFormat": "avif", // format of the animated icons. "svg" loads the SMIL originals from graphics/smil, "avif" loads graphics/avif (made by scripts/svg2avif.py; any icon without one falls back to its svg).
 
     "performance": {
       "disableLiveBackdropBlur": true, // turns expensive live CSS backdrop blur into static glass surfaces.
@@ -51,7 +52,6 @@ export let config = {
       "glassCacheScale": 0.42, // lower = faster and softer, higher = sharper but more memory.
       "glassCacheBlurPx": 28,
       "lightweightMotion": true, // avoids JS-driven per-frame decoration where a CSS transition or static state works.
-      "cityTickerFps": 60, // ticker frame cap. 60 keeps the LDL ticker fluid on standard displays.
       "forecastTextSlideMs": 220,
       "mainRadarFrames": 48,
       "mainRadarLoops": 12,
@@ -608,4 +608,4 @@ export const holidayMapping = {
 
 
 
-export const versionID = '26.10.24';
+export const versionID = '26.10.25';

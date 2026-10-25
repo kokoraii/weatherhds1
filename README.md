@@ -8,7 +8,8 @@
   <p>WeatherHDS is a Go app that simplifies the presentation of modern and updated weather graphics on digital displays or other types of broadcasts. Designed with modularity and infinite customizability in mind, thanks to WeatherHDS's simplified underlying system completely built on standard web technologies.</p>
 
   <h1>Building</h1>
-  <p>Requires Go 1.20+. To build, run <code>go build -o weatherhds</code> in the project root. The executable will just simply appear.</p>
+  <p>Requires Go 1.26.3 or newer. To build, run <code>go build -o weatherhds</code> in the project root. The executable will just simply appear.</p>
+  <p>The music streamer plays Ogg Opus directly. Other common audio formats and video containers with audio tracks are decoded and transcoded to Opus by FFmpeg. The standard Go build uses the <code>ffmpeg</code> executable from PATH for these files. The Windows portable build uses the native FFmpeg libraries by default and requires the MSYS2 CLANG64 FFmpeg development libraries; use <code>scripts/build-windows.ps1 -MediaBackend builtin</code> to build without those libraries. FFmpeg cannot play files with no audio stream, and supported codecs depend on the installed FFmpeg build.</p>
   <h3>Downloads</h3>
   <ul>
     <li>Download stable versions from the <a href="https://github.com/meowraii/weatherhds1/releases">Releases page</a>.</li>
@@ -42,6 +43,7 @@
   <li><code>videoBackgrounds</code>: Enables or disables the video backgrounds on the current conditions slide.</li>
   <li><code>currentConditionsGradient</code>: Enables a background gradient on the current conditions slide based on time relative to sunrise or sunset.</li>
   <li><code>staticIcons</code>: If true, uses non-animated weather icons.</li>
+  <li><code>animatedIconFormat</code>: Format of the animated weather icons: <code>svg</code> (default, SMIL-animated, from <code>public/graphics/smil</code>) or <code>avif</code> (pre-rendered animated AVIF from <code>public/graphics/avif</code>, see below). Icons without a converted file fall back to their SVG.</li>
   <li><code>ldlClock</code>: In LDL-only mode, shows or hides the clock and network logo on the LDL.</li>
   <li><code>presentationConfig</code>: Object containing slide and display mode toggles.
     <ul>
@@ -65,10 +67,17 @@
   <li><code>refreshInterval</code>: How often to refresh the browser tab, in minutes.</li>
 </ul>
 
+<h3>Animated AVIF icons</h3>
+<p>The animated SVG icons are drawn by the browser's SMIL engine on the main thread, which can be heavy on weak hardware. <code>scripts/svg2avif.py</code> pre-renders the SVGs in <code>public/graphics/smil</code> to animated, transparent AVIF files in <code>public/graphics/avif</code>:</p>
+<pre>pip install pillow playwright
+python scripts/svg2avif.py</pre>
+<p>Then set <code>animatedIconFormat</code> to <code>"avif"</code> in <code>public/config.js</code> and restart. It renders each frame in your installed Edge or Chrome (or <code>playwright install chromium</code>) and works out every icon's loop length from its SVG timing, so loops are seamless. Useful flags: <code>--size</code> (default 256), <code>--fps</code> (default 30), <code>--quality</code>, <code>--force</code>, <code>--jobs</code>. Run <code>python scripts/svg2avif.py --help</code> for all of them.</p>
+
 <h3>Server Configuration</h3>
 <ul>
   <li><code>units</code>: Measurement units (e.g., "m" for metric, "e" for imperial).</li>
   <li><code>webPort</code>: Port for the web server (default 3000).</li>
+  <li>The admin panel listens separately on port <code>1005</code>.</li>
   <li><code>cacheValidTime</code>: Time in seconds to cache weather data.</li>
 </ul>
 

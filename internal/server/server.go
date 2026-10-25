@@ -85,6 +85,7 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	if err != nil {
 		return err
 	}
+	defer musicService.Close()
 	musicService.Start(ctx)
 
 	e := echo.New()
@@ -283,13 +284,33 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 			}
 			return listenErr
 		}
+		adminListener, listenErr := net.Listen("tcp", ":"+strconv.Itoa(adminPort))
+		if listenErr != nil {
+			_ = listener.Close()
+			return fmt.Errorf("listen for admin panel on port %d: %w", adminPort, listenErr)
+		}
 		logInfo(logger, "server", "HTTP server listening on http://localhost:%d", port)
 		httpServer := &http.Server{Handler: e, ReadHeaderTimeout: 10 * time.Second}
+		adminServer := &http.Server{Handler: newAdminHandler(runtimePaths.AdminDir), ReadHeaderTimeout: 10 * time.Second}
+		serverCtx, stopServers := context.WithCancel(ctx)
+		defer stopServers()
 		go func() {
-			<-ctx.Done()
+			<-serverCtx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			_ = httpServer.Shutdown(shutdownCtx)
+		}()
+		go func() {
+			<-serverCtx.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = adminServer.Shutdown(shutdownCtx)
+		}()
+		go func() {
+			logInfo(logger, "server", "Admin panel listening on http://localhost:%d", adminPort)
+			if serveErr := adminServer.Serve(adminListener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+				logInfo(logger, "server", "Admin panel server stopped: %v", serveErr)
+			}
 		}()
 		return httpServer.Serve(listener)
 	}

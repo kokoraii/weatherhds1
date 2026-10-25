@@ -1,6 +1,8 @@
 import { requestWxData } from './data.js'
 import { config, locationConfig, serverConfig, weatherIcons, displayUnits, brand } from "../config.js";
 import { formatTime } from './weather.js';
+import { startMarquee } from './marquee.js'
+import { weatherIconUrl } from './icons.js'
 
 const ldlPresentationSlides = {
     "0": { htmlID: "ldl-current",        durationMS: 15000, label: 'Now' },
@@ -23,7 +25,7 @@ const logTheFrickinTime = () => `[ldl.js] | ${new Date().toLocaleString()} |`;
 
 let ldlLocationIndex = 0;
 let ldlSlideIndex = 0;
-let iconDir = "animated"
+let iconDir = "smil"
 
 const selectedDisplayUnits = displayUnits[serverConfig.units] || displayUnits['m'];
 let endingTemp = selectedDisplayUnits.endingTemp, endingWind = selectedDisplayUnits.endingWind, endingDistance = selectedDisplayUnits.endingDistance, endingPressure = selectedDisplayUnits.endingPressure, endingCeiling = selectedDisplayUnits.endingCeiling;
@@ -161,36 +163,13 @@ function initProviderLogoCycler() {
 
 initProviderLogoCycler();
 
-function initializeMarquee(retries = 3) {
-  if (typeof $ === 'undefined' || typeof $.fn.marquee === 'undefined') {
-    if (retries > 0) {
-      setTimeout(() => initializeMarquee(retries - 1), 100);
-    }
-    return;
-  }
-
-  try {
-    const $element = $('#ldl-bulletin-text');
-    $element.marquee('destroy');
-    $element.css('transform', 'none');
-    
-    setTimeout(() => {
-      $element.marquee({
-        speed: 180,
-        gap: 100,
-        direction: 'left',
-        duplicated: false,
-        pauseOnHover: false,
-        startVisible: true,
-        delayBeforeStart: 0
-      });
-    }, 100);
-  } catch (error) {
-    console.error('[initializeMarquee] Error:', error);
-    if (retries > 0) {
-      setTimeout(() => initializeMarquee(retries - 1), 200);
-    }
-  }
+function initializeMarquee() {
+  startMarquee(ldlDomCache.bulletinText, {
+    speed: 180,
+    gap: 100,
+    startVisible: true,
+    delayBeforeStart: 0
+  });
 }
 
 export function requestBulletinCrawl(text, alertCategory, headlineText, country, colorCode) {
@@ -293,7 +272,7 @@ async function LDLData() {
         if (config.staticIcons === true) {
             iconDir = "static"
         } else {
-            iconDir = "animated"
+            iconDir = "smil"
         }
 
         const ldlLocations = locationConfig.ldlLocations;
@@ -394,7 +373,7 @@ function appendLDLCurrent() {
         const iconCode = current.iconCode
         const dayOrNight = current.dayOrNight
         const iconPath = weatherIcons[iconCode]?.[dayOrNight === 'D' ? 0 : 1] ?? 'not-available.svg'
-        c.currentIcon.src = `/graphics/${iconDir}/${iconPath}`
+        c.currentIcon.src = weatherIconUrl(iconDir, iconPath)
     }
 }
 
@@ -414,7 +393,7 @@ function appendLDLHourly() {
             const iconCode = hourly.iconCode[i]
             const dayOrNight = hourly.dayOrNight[i]
             const iconPath = weatherIcons[iconCode]?.[dayOrNight === 'D' ? 0 : 1] ?? 'not-available.svg'
-            c[`ldlHourlyIcon${i}`].src = `/graphics/${iconDir}/${iconPath}`
+            c[`ldlHourlyIcon${i}`].src = weatherIconUrl(iconDir, iconPath)
         }
     }
 }
@@ -515,7 +494,7 @@ function renderShorttermPeriod(period) {
     const popEl = container.querySelector('#ldl-shortterm-period-pop0')
     const narrativeEl = container.querySelector('#ldl-shortterm-period-narrative0')
     if (titleEl) titleEl.textContent = period.title
-    if (iconEl) iconEl.src = `/graphics/${iconDir}/${period.icon}`
+    if (iconEl) iconEl.src = weatherIconUrl(iconDir, period.icon)
     if (tempEl) {
         tempEl.classList.toggle('ldl-temp-high', period.dayOrNight === 'D')
         tempEl.classList.toggle('ldl-temp-low', period.dayOrNight !== 'D')
@@ -605,7 +584,7 @@ function buildDailyPeriods(forecast) {
         periods.push({
             title: forecast.dayOfWeek[i]?.slice(0, 3).toUpperCase() ?? '---',
             condition,
-            iconUrl: `/graphics/${iconDir}/${iconPath}`,
+            iconUrl: weatherIconUrl(iconDir, iconPath),
             high: `${forecast.calendarDayTemperatureMax?.[i] ?? '--'}°`,
             low: `${forecast.calendarDayTemperatureMin?.[i] ?? '--'}°`,
             pop: dp?.precipChance?.[dpIndex] != null ? `${dp.precipChance[dpIndex]}%` : '--',
@@ -796,12 +775,12 @@ function appendLDLAlmanac() {
     if (c.sunProgressArch) {
         if (isNight) {
             c.sunProgressArch.classList.add('night-mode');
-            c.sunIndicator.style.background = `url('/graphics/${iconDir}/${phaseToSVG[currentCode]}')`;
+            c.sunIndicator.style.background = `url('${weatherIconUrl(iconDir, phaseToSVG[currentCode])}')`;
             c.riseTimeLabel.textContent = "moonrise";
             c.setTimeLabel.textContent = "moonset";
         } else {
             c.sunProgressArch.classList.remove('night-mode');
-            c.sunIndicator.style.background = `url('/graphics/${iconDir}/clear-day.svg')`;
+            c.sunIndicator.style.background = `url('${weatherIconUrl(iconDir, "clear-day.svg")}')`;
             c.riseTimeLabel.textContent = "sunrise";
             c.setTimeLabel.textContent = "sunset";
         }
@@ -825,7 +804,7 @@ function appendLDLAlmanac() {
         return {
             name: moonPhaseNames[index],
             date: label,
-            icon: `/graphics/animated/${iconName}`,
+            icon: weatherIconUrl("smil", iconName),
             code: code,
             dayIndex: index
         };
@@ -878,7 +857,7 @@ function appendLDLAlmanac() {
         predictedPhases.push({
             name: p.name,
             date: `${month} ${day}`,
-            icon: `/graphics/animated/${p.icon}.svg`
+            icon: weatherIconUrl("smil", `${p.icon}.svg`)
         });
     }
 

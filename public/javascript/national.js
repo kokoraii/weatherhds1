@@ -1,9 +1,10 @@
 import { config, locationConfig, displayUnits, serverConfig, weatherIcons } from "../config.js";
 import { requestWxData } from "./data.js";
 import { RadarMap } from "./radar.js";
+import { weatherIconUrl } from "./icons.js";
 
 const log = () => `[national.js] | ${new Date().toLocaleString()} |`;
-const iconDir = config.staticIcons ? "static" : "animated";
+const iconDir = config.staticIcons ? "static" : "smil";
 const units = displayUnits[serverConfig.units] || displayUnits["m"];
 
 const SLIDE_DURATION = 12000;
@@ -74,7 +75,7 @@ function buildCurrentCard(locationName, wxData) {
 
     const icon = document.createElement("img");
     icon.className = "national-location-icon";
-    icon.src = `/graphics/${iconDir}/${current ? iconPath(current.iconCode, current.dayorNight) : "not-available.svg"}`;
+    icon.src = weatherIconUrl(iconDir, current ? iconPath(current.iconCode, current.dayorNight) : "not-available.svg");
     card.appendChild(icon);
 
     return card;
@@ -117,7 +118,7 @@ function buildForecastCard(locationName, wxData, dayIndex) {
 
     const icon = document.createElement("img");
     icon.className = "national-location-icon";
-    icon.src = `/graphics/${iconDir}/${ic != null ? iconPath(ic, dn) : "not-available.svg"}`;
+    icon.src = weatherIconUrl(iconDir, ic != null ? iconPath(ic, dn) : "not-available.svg");
     card.appendChild(icon);
 
     return card;

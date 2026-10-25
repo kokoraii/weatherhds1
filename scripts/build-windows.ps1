@@ -2,7 +2,7 @@ param(
     [string]$Version = '26.05.29',
     [string]$Output = '',
     [ValidateSet('builtin', 'ffmpeg')]
-    [string]$MediaBackend = 'builtin',
+    [string]$MediaBackend = 'ffmpeg',
     [switch]$NativeVocallocal
 )
 

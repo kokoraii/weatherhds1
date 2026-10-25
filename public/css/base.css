@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100..900;1,100..900&display=swap');
 :root {
   --main-font-family: 'Poppins', sans-serif; /* everything else */
   --secondary-font-family: 'Poppins', sans-serif; /* forecast text narratives and some titles */
@@ -188,6 +187,12 @@ hr {
   margin-bottom: -20px;
   margin-top: 0%;
   border-top: 2px solid var(--text);
+}
+
+/* An SVG in an <img> letterboxes itself inside any box, but the AVIF icons are plain bitmaps and would
+   stretch to fill it. Keep their proportions wherever they are used. */
+img[src*="/graphics/avif/"] {
+  object-fit: contain;
 }
 
 /* Performance-first DOM renderer.

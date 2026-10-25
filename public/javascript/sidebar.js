@@ -1,9 +1,10 @@
 import { requestWxData } from './data.js';
 import { weatherIcons, locationConfig, serverConfig, displayUnits, config } from '../config.js';
 import { RadarMap } from './radar.js';
+import { weatherIconUrl } from './icons.js';
 
 const perf = config.performance ?? {};
-const iconDir = config.staticIcons ? "static" : "animated";
+const iconDir = config.staticIcons ? "static" : "smil";
 
 const radarInstance = new RadarMap('sidebar-radar-map', {
     totalFrames:  Number(perf.sidebarRadarFrames ?? 24),
@@ -181,7 +182,7 @@ async function refreshSidebar() {
     setSlidingText(conditionsLocation, displayName);
     setSlidingText(conditionsTemp, formatTemp(current.temperature));
     setSlidingText(conditionsPhrase, current.wxPhraseLong);
-    if (conditionsIcon)     conditionsIcon.src              = `/graphics/${iconDir}/${iconFile}`;
+    if (conditionsIcon)     conditionsIcon.src              = weatherIconUrl(iconDir, iconFile);
 
     const ceiling   = current.cloudCeiling == null ? 'Unlimited' : `${current.cloudCeiling}${endingCeiling}`;
     const month     = MONTHS[new Date().getMonth()];

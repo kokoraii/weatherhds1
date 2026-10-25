@@ -1,0 +1,35 @@
+/* Scrolling text, driven by javascript/marquee.js (--mq-* variables are set per element there). */
+
+.marquee-track {
+  display: flex;
+  flex: none;
+  width: max-content;
+  will-change: transform;
+  animation: marquee-loop var(--mq-loop-ms) linear var(--mq-delay) infinite backwards;
+}
+
+/* Runs once first (e.g. starting in place, or sliding in from the right), then hands over to the loop. */
+.marquee-track--first {
+  animation:
+    marquee-first var(--mq-first-ms) linear var(--mq-delay) 1 both,
+    marquee-loop var(--mq-loop-ms) linear calc(var(--mq-delay) + var(--mq-first-ms)) infinite;
+}
+
+.marquee-item {
+  flex: none;
+  white-space: nowrap;
+}
+
+.marquee--pause-on-hover:hover > .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-first {
+  from { transform: translateX(var(--mq-first-from)); }
+  to { transform: translateX(var(--mq-end)); }
+}
+
+@keyframes marquee-loop {
+  from { transform: translateX(var(--mq-loop-from)); }
+  to { transform: translateX(var(--mq-end)); }
+}
