@@ -284,14 +284,8 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 			}
 			return listenErr
 		}
-		adminListener, listenErr := net.Listen("tcp", ":"+strconv.Itoa(adminPort))
-		if listenErr != nil {
-			_ = listener.Close()
-			return fmt.Errorf("listen for admin panel on port %d: %w", adminPort, listenErr)
-		}
 		logInfo(logger, "server", "HTTP server listening on http://localhost:%d", port)
 		httpServer := &http.Server{Handler: e, ReadHeaderTimeout: 10 * time.Second}
-		adminServer := &http.Server{Handler: newAdminHandler(runtimePaths.AdminDir), ReadHeaderTimeout: 10 * time.Second}
 		serverCtx, stopServers := context.WithCancel(ctx)
 		defer stopServers()
 		go func() {
@@ -300,18 +294,26 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 			defer cancel()
 			_ = httpServer.Shutdown(shutdownCtx)
 		}()
-		go func() {
-			<-serverCtx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			_ = adminServer.Shutdown(shutdownCtx)
-		}()
-		go func() {
-			logInfo(logger, "server", "Admin panel listening on http://localhost:%d", adminPort)
-			if serveErr := adminServer.Serve(adminListener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-				logInfo(logger, "server", "Admin panel server stopped: %v", serveErr)
-			}
-		}()
+
+		// The admin panel is optional: if its port can't be bound (ports below 1024 need privileges on Linux),
+		// log it and keep serving the display instead of exiting.
+		if adminListener, adminErr := net.Listen("tcp", ":"+strconv.Itoa(adminPort)); adminErr != nil {
+			logInfo(logger, "server", "Admin panel disabled, cannot listen on port %d: %v", adminPort, adminErr)
+		} else {
+			adminServer := &http.Server{Handler: newAdminHandler(runtimePaths.AdminDir), ReadHeaderTimeout: 10 * time.Second}
+			go func() {
+				<-serverCtx.Done()
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				_ = adminServer.Shutdown(shutdownCtx)
+			}()
+			go func() {
+				logInfo(logger, "server", "Admin panel listening on http://localhost:%d", adminPort)
+				if serveErr := adminServer.Serve(adminListener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+					logInfo(logger, "server", "Admin panel server stopped: %v", serveErr)
+				}
+			}()
+		}
 		return httpServer.Serve(listener)
 	}
 }

@@ -31,7 +31,7 @@ func ensureRuntimeFiles(workspaceDir string, embedded fs.FS) (RuntimePaths, erro
 		WorkspaceDir: workspaceDir,
 		PublicDir:    filepath.Join(workspaceDir, "public"),
 		AdminDir:     filepath.Join(workspaceDir, "admin"),
-		ConfigPath:  filepath.Join(workspaceDir, "public", "config.js"),
+		ConfigPath:   filepath.Join(workspaceDir, "public", "config.js"),
 		EnvPath:      filepath.Join(workspaceDir, ".env"),
 	}
 
