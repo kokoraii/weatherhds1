@@ -12,7 +12,6 @@ import (
 const defaultEnvTemplate = `# WeatherHDS local environment.
 # These values override matching public/config.js serverConfig values when present.
 TWC_API_KEY=
-MAPBOX_API_KEY=
 WEB_PORT=3000
 UNITS=m
 CACHE_VALID_TIME=720

@@ -146,9 +146,9 @@
 	background: rgba(4, 15, 26, 0.32);
 }
 
-#national-radar-map .mapboxgl-canvas,
-#national-radar-map .mapboxgl-canvas-container,
-#national-radar-map .mapboxgl-map {
+#national-radar-map .maplibregl-canvas,
+#national-radar-map .maplibregl-canvas-container,
+#national-radar-map .maplibregl-map {
 	border-radius: inherit;
 }
 

@@ -3,7 +3,7 @@ import { config } from "../config.js";
 const perf = config.performance ?? {};
 
 const DEFAULTS = {
-    mapStyle: "mapbox://styles/peytonwdym/clov0gd3u00mj01pe1wmhb2j5",
+    mapStyle: "/maps/radar-dark.json", // MapLibre style on OpenFreeMap tiles
     product: "twcRadarHcMosaic",
     totalFrames: Number(perf.mainRadarFrames ?? 48),
     frameDelay: Number(perf.radarFrameDelay ?? 150),
@@ -136,7 +136,7 @@ export class RadarMap {
         }
 
         this.#pendingInit = null;
-        const { twcApiKey, mapboxToken } = await getKeys();
+        const { twcApiKey } = await getKeys();
         const center = [lon, lat];
 
         if (this.#map) {
@@ -150,12 +150,10 @@ export class RadarMap {
             return this.#loadAndAnimate(product, twcApiKey);
         }
 
-        this.#map = new mapboxgl.Map({
+        this.#map = new maplibregl.Map({
             container: this.#containerId,
             style: this.#opts.mapStyle,
             center,
-            accessToken: mapboxToken,
-            telemetry: false,
             interactive: false,
             zoom,
             attributionControl: false,
@@ -164,7 +162,6 @@ export class RadarMap {
             // Every radar frame change redraws the whole map; keep each redraw as cheap as possible.
             fadeDuration: 0,                    // no label fade, which keeps rendering for 300 ms after each redraw
             renderWorldCopies: false,
-            performanceMetricsCollection: false,
         });
 
         await new Promise((resolve) => {
@@ -174,9 +171,7 @@ export class RadarMap {
                         this.#map.setLayoutProperty(layer.id, "text-size", this.#opts.labelTextSize);
                     }
                 });
-                try {
-                    this.#map.setLayoutProperty("road-number-shield-navigation", "text-size", 18);
-                } catch (_) {}
+                this.#map.setLayoutProperty("road-shield", "text-size", 18);
                 resolve();
             });
         });

@@ -39,11 +39,6 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	_ = godotenv.Load(runtimePaths.EnvPath)
 	twcAPIKey := strings.TrimSpace(os.Getenv("TWC_API_KEY"))
 	twcEnabled := twcAPIKey != ""
-	mapboxTokenRaw := strings.TrimSpace(os.Getenv("MAPBOX_API_KEY"))
-	var mapboxToken *string
-	if mapboxTokenRaw != "" {
-		mapboxToken = &mapboxTokenRaw
-	}
 	cfg := loadConfig(runtimePaths.ConfigPath)
 	publicDir := runtimePaths.PublicDir
 	versionID := loadVersionFromConfig(runtimePaths.ConfigPath)
@@ -111,7 +106,7 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	})
 
 	e.GET("/config/keys", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]any{"twcApiKey": twcAPIKey, "mapboxToken": mapboxToken})
+		return c.JSON(http.StatusOK, map[string]any{"twcApiKey": twcAPIKey})
 	})
 	e.GET("/heartbeat", func(c echo.Context) error {
 		c.Response().Header().Set("Cache-Control", "no-store")

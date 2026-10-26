@@ -819,12 +819,12 @@
   box-shadow: inset 0 0 20px rgba(170, 180, 188, 0.08);
 }
 
-#radar .mapboxgl-map {
+#radar .maplibregl-map {
   width: 100% !important;
   height: 100% !important;
 }
 
-.mapboxgl-control-container {
+.maplibregl-control-container {
   width: 100%;
   height: 100% !important;
 }
@@ -916,7 +916,7 @@
   flex-shrink: 0;
 }
 
-.mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right {
+.maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right {
   opacity: 0%;
 }
 
