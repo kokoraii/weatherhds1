@@ -161,6 +161,10 @@ export class RadarMap {
             attributionControl: false,
             preserveDrawingBuffer: false,
             trackResize: true,
+            // Every radar frame change redraws the whole map; keep each redraw as cheap as possible.
+            fadeDuration: 0,                    // no label fade, which keeps rendering for 300 ms after each redraw
+            renderWorldCopies: false,
+            performanceMetricsCollection: false,
         });
 
         await new Promise((resolve) => {

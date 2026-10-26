@@ -38,6 +38,12 @@ let renderToken = 0;
 let layoutRaf = 0;
 let rebuildTimer = 0;
 
+// Last background offset written to each glass node, so unchanged nodes aren't restyled.
+const lastGlassLayout = new WeakMap();
+// Glass nodes appearing (display none -> shown) or resizing re-trigger the layout pass.
+const glassResizeObserver = new ResizeObserver(() => scheduleGlassLayout());
+const observedGlass = new WeakSet();
+
 if (perf.disableLiveBackdropBlur !== false) {
     body.classList.add("performance-static-glass");
 }
@@ -60,7 +66,11 @@ function observeWallpaper() {
 
     const layoutObserver = new MutationObserver(() => scheduleGlassLayout());
     layoutObserver.observe(view, { attributes: true, attributeFilter: ["style", "class"] });
-    setInterval(scheduleGlassLayout, 1500);
+
+    // Panels only move when something moves them: slides and LDL entries animate or transition in,
+    // so re-align once that motion settles (coalesced into one pass per frame).
+    document.addEventListener("transitionend", scheduleGlassLayout, { passive: true });
+    document.addEventListener("animationend", scheduleGlassLayout, { passive: true });
 }
 
 function scheduleGlassRebuild() {
@@ -157,11 +167,22 @@ function syncGlassLayout() {
     const glassNodes = document.querySelectorAll(GLASS_SELECTOR);
 
     for (const node of glassNodes) {
+        if (!observedGlass.has(node)) {
+            observedGlass.add(node);
+            glassResizeObserver.observe(node);
+        }
+
         const rect = node.getBoundingClientRect();
         if (rect.width < 1 || rect.height < 1) continue;
 
-        node.style.setProperty("--glass-bg-x", `${(viewRect.left - rect.left) / scaleX}px`);
-        node.style.setProperty("--glass-bg-y", `${(viewRect.top - rect.top) / scaleY}px`);
+        const x = `${(viewRect.left - rect.left) / scaleX}px`;
+        const y = `${(viewRect.top - rect.top) / scaleY}px`;
+        const key = `${x} ${y} ${layoutWidth} ${layoutHeight}`;
+        if (lastGlassLayout.get(node) === key) continue;
+        lastGlassLayout.set(node, key);
+
+        node.style.setProperty("--glass-bg-x", x);
+        node.style.setProperty("--glass-bg-y", y);
         node.style.setProperty("--glass-bg-w", `${layoutWidth}px`);
         node.style.setProperty("--glass-bg-h", `${layoutHeight}px`);
     }

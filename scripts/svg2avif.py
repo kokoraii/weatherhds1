@@ -323,8 +323,10 @@ def parse_args() -> argparse.Namespace:
                    help=f"SVG files or folders (default: {DEFAULT_SRC.relative_to(REPO_ROOT)})")
     p.add_argument("--out-dir", type=Path, default=DEFAULT_OUT,
                    help=f"where the .avif files go (default: {DEFAULT_OUT.relative_to(REPO_ROOT)})")
-    p.add_argument("--size", type=int, default=256, help="longest side in pixels (default 256)")
-    p.add_argument("--fps", type=int, default=30, help="frames per second; 30 paces evenly on 60Hz screens (default 30)")
+    # The browser decodes every frame on the CPU, so size and fps are the cost. Icons show at <=148 layout px
+    # in the 2560-wide canvas, so 160 px stays sharp; 20 fps still paces evenly on 60 Hz screens.
+    p.add_argument("--size", type=int, default=160, help="longest side in pixels (default 160)")
+    p.add_argument("--fps", type=int, default=20, help="frames per second; 20 paces evenly on 60Hz screens (default 20)")
     p.add_argument("--quality", type=int, default=70, help="AVIF quality 0-100 (default 70)")
     p.add_argument("--speed", type=int, default=6, help="encoder speed 0 (slow/small) to 10 (fast) (default 6)")
     p.add_argument("--subsampling", default="4:4:4", choices=["4:4:4", "4:2:2", "4:2:0"],

@@ -71,7 +71,8 @@
 <p>The animated SVG icons are drawn by the browser's SMIL engine on the main thread, which can be heavy on weak hardware. <code>scripts/svg2avif.py</code> pre-renders the SVGs in <code>public/graphics/smil</code> to animated, transparent AVIF files in <code>public/graphics/avif</code>:</p>
 <pre>pip install pillow playwright
 python scripts/svg2avif.py</pre>
-<p>Then set <code>animatedIconFormat</code> to <code>"avif"</code> in <code>public/config.js</code> and restart. It renders each frame in your installed Edge or Chrome (or <code>playwright install chromium</code>) and works out every icon's loop length from its SVG timing, so loops are seamless. Useful flags: <code>--size</code> (default 256), <code>--fps</code> (default 30), <code>--quality</code>, <code>--force</code>, <code>--jobs</code>. Run <code>python scripts/svg2avif.py --help</code> for all of them.</p>
+<p>Then set <code>animatedIconFormat</code> to <code>"avif"</code> in <code>public/config.js</code> and restart. It renders each frame in your installed Edge or Chrome (or <code>playwright install chromium</code>) and works out every icon's loop length from its SVG timing, so loops are seamless. Useful flags: <code>--size</code> (default 160), <code>--fps</code> (default 20), <code>--quality</code>, <code>--force</code>, <code>--jobs</code>. Run <code>python scripts/svg2avif.py --help</code> for all of them.</p>
+<p>The animated weather backgrounds in <code>public/images/avif</code> are decoded on the CPU frame by frame too. <code>python scripts/shrink_backgrounds.py</code> (needs ffmpeg with libsvtav1) re-encodes them in place to 540 px tall at 30 fps, which matches the panels they fill; it skips files already that small, so new backgrounds can be dropped in and the script re-run.</p>
 
 <h3>Server Configuration</h3>
 <ul>
