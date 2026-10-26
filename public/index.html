@@ -12,6 +12,7 @@
         <link rel="stylesheet" href="/css/ldl.css">
         <link rel="stylesheet" href="/css/animations.css">
         <link rel="stylesheet" href="/css/marquee.css">
+        <link rel="stylesheet" href="/css/topbar.css">
         <link rel="icon" type="image/x-icon" href="/images/favicon.png">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,6 +29,7 @@
         <script type="module" src="javascript/ldl.js" defer></script>
         <script type="module" src="javascript/radar.js" defer></script>
         <script type="module" src="javascript/sidebar.js" defer></script>
+        <script type="module" src="javascript/topbar.js" defer></script>
         <link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet">
         <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
         <script src='https://joeiddon.github.io/perlin/perlin.js'></script>
@@ -39,6 +41,18 @@
 
             <div id="error-printer-container" style="position: absolute;background-color: rgb(104, 26, 26);top: 2%;left:2%;font-family: monospace;padding: 2px 18px;-webkit-text-stroke-color: black;-webkit-text-stroke-width: 0.5px;font-size: 18pt;z-index: 999;font-weight: 600;">
                 
+            </div>
+
+            <!-- Shown per presentationConfig.topbar (see layout.js). With the sidebar off, topbar.js fills it
+                 (network logo, status line, affiliate logo); otherwise it is blank top padding. -->
+            <div class="topbar">
+                <div class="topbar-content">
+                    <div class="topbar-left">
+                        <img class="topbar-network-logo" id="topbar-network-logo" alt="">
+                        <div class="topbar-status" id="topbar-status"></div>
+                    </div>
+                    <div class="topbar-right"></div>
+                </div>
             </div>
 
             <div class="wallpaper"></div>
@@ -569,13 +583,8 @@
                         </div>
                         <div class="ldl-bulletin-text-container" id="ldl-bulletin-text"></div>
                     </div>
-                    <div class="cityticker">
-                        <div class="cityticker-body">
-                            <div class="cityticker-track"></div>
-                        </div>
-                    </div>
                 </div>
-                
+
             </div>
             
             <div class="ldl-weather">
@@ -589,9 +598,22 @@
                         <img id="ldl-provider-logo" class="ldl-provider-logo" src="" alt="Provider logo">
                         <span id="ldl-provider-extratext-tailing" class="ldl-provider-extratext"></span>
                     </div>
+                    <!-- Only with the top bar's content showing (topbar.js), in place of the clock and logo. -->
+                    <div class="ldl-rail-radar">
+                        <div class="ldl-rail-radar-title">PAST 3 HOURS</div>
+                        <div class="ldl-rail-radar-frame">
+                            <div id="ldl-rail-radar-map"></div>
+                            <div class="ldl-rail-radar-clock" id="ldl-rail-radar-clock"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="ldl-main-content">
-                    
+                    <div class="cityticker">
+                        <div class="cityticker-body">
+                            <div class="cityticker-track"></div>
+                        </div>
+                    </div>
+
                     <div class="ldl-container">
                         <div class="ldl-carousel-container">
                             <div class="ldl-carousel-current" id="ldl-carousel-current"></div>

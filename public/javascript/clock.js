@@ -1,9 +1,11 @@
 import { config, clock as clockConfig } from "../config.js";
+import { topbarContent } from "./layout.js";
 
 const ldlDateEl = document.getElementById("ldl-date");
 const ldlTimeEl = document.getElementById("ldl-time");
 
-if (ldlDateEl && ldlTimeEl) {
+// With the filled top bar, the LDL clock is hidden and topbar_status.js shows the time and date instead.
+if (ldlDateEl && ldlTimeEl && !topbarContent) {
 	const fallbackZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 	const systemZone = config.systemTimeZone || fallbackZone;
 	const showSeconds = clockConfig?.showSeconds !== false;

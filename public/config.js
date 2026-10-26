@@ -112,6 +112,8 @@ export let config = {
         "ldl": true,
         "ldlClock": false,
         "ldlBack": true,
+        "sidebar": true, // left rail with the logo, current conditions, sidebar radar and music
+        "topbar": "auto", // slim bar across the top. "auto": shown when the sidebar is off, with the network logo, clock and affiliate logo (the LDL brand rail then shows a 3 hour radar). true: always shown (left blank next to the sidebar, as top padding). false: never.
         "backgrounds": true,
         "repeatMain": true,
         "bannerLogo": true,
@@ -593,6 +595,7 @@ export const holidayMapping = {
     "07-01": { name: "Canada Day", color0: "#ff0000", color1: "#ffffff", icon: "", banner: "" },
     "07-04": { name: "Independence Day (US)", color0: "#de2a16", color1: "#de2a16", icon: "", banner: "" },
     "09-05": { name: "Labor Day", color0: "#1c3258", color1: "#a52d30", icon: "", banner: "" },
+    "09-10": { name: "Kirkaversary (US)", color0: "#a74101", color1: "#a74101", icon: "", banner: "" },
     "09-22": { name: "First Day of Fall", color0: "#a74101", color1: "#a74101", icon: "", banner: "" },
     "10-13": { name: "Thanksgiving (Canada)", color0: "#b85423", color1: "#b85423", icon: "", banner: "" },
     "10-31": { name: "Halloween", color0: "#d79f00", color1: "#d79f00", icon: "", banner: "" },

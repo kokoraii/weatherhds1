@@ -2,6 +2,7 @@ import { requestWxData } from './data.js';
 import { weatherIcons, locationConfig, serverConfig, displayUnits, config } from '../config.js';
 import { RadarMap } from './radar.js';
 import { weatherIconUrl } from './icons.js';
+import { sidebarEnabled } from './layout.js';
 
 const perf = config.performance ?? {};
 const iconDir = config.staticIcons ? "static" : "smil";
@@ -201,5 +202,8 @@ async function refreshSidebar() {
     ]);
 }
 
-requestAnimationFrame(() => requestAnimationFrame(refreshSidebar));
-setInterval(refreshSidebar, REFRESH_MS);
+// With the sidebar off, nothing here runs: no data refresh, no sidebar radar map.
+if (sidebarEnabled) {
+    requestAnimationFrame(() => requestAnimationFrame(refreshSidebar));
+    setInterval(refreshSidebar, REFRESH_MS);
+}

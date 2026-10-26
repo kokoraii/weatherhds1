@@ -195,6 +195,11 @@ function applyState(statePayload) {
 
     dom.display?.classList.toggle("music-playing", isPlaying);
 
+    // For other now-playing displays (the top bar's status line); elapsed was measured at syncedAt.
+    document.dispatchEvent(new CustomEvent("music-state", {
+        detail: { playing: isPlaying, title: track.title || "", artist: track.artist || "", elapsed: serverElapsed, duration: trackDuration, syncedAt: lastSyncTime },
+    }));
+
     stopProgress();
     if (isPlaying) {
         startProgress();

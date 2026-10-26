@@ -1,0 +1,172 @@
+/* Top bar (presentationConfig.topbar; layout.js sets html.topbar-on / html.topbar-filled).
+   Same surface as the LDL, edge to edge and up to the top of the screen; its content sits at the bottom
+   so it stays inside the safe area, and lines up with the main presentation's side spacing. */
+
+.topbar {
+  display: none;
+  position: relative;
+  z-index: 30;
+  flex: 0 0 var(--topbar-height);
+  width: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(2, 8, 18, 0.9), rgba(3, 17, 34, 0.76));
+  backdrop-filter: blur(96px) saturate(185%);
+  -webkit-backdrop-filter: blur(96px) saturate(185%);
+  border-bottom: 1px solid rgba(205, 232, 255, 0.2);
+}
+
+:root.topbar-on .topbar {
+  display: flex;
+}
+
+.topbar-content {
+  display: none;
+  align-self: flex-end;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  height: 78px; /* 64px of content above 14px of bottom padding */
+  padding: 0 calc(var(--presentation-gutter) + var(--presentation-pad)) 8px;
+  box-sizing: border-box;
+}
+
+:root.topbar-filled .topbar-content {
+  display: flex;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+  height: 100%;
+}
+
+.topbar-network-logo {
+  height: 52px;
+  width: auto;
+}
+
+/* Status line (topbar_status.js): date, song playing and current conditions, one at a time. */
+.topbar-status {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 52px;
+  padding-left: 28px;
+  border-left: 1px solid rgba(205, 232, 255, 0.2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: pre;
+  overflow: hidden;
+  transition: opacity 0.5s ease;
+}
+
+.topbar-status.is-fading {
+  opacity: 0;
+}
+
+.topbar-status .light,
+.ldl-rail-radar-clock .light {
+  font-weight: 300;
+}
+
+.ldl-rail-radar-clock .tz {
+  font-weight: 300;
+}
+
+.topbar-status-icon {
+  height: 1.5em;
+  width: auto;
+}
+
+/* The LDL clock is replaced by the status line and the radar notch clock. */
+:root.topbar-filled .ldl-date-time-container {
+  display: none;
+}
+
+/* Affiliate logo(s), moved here by topbar.js; ldl.js keeps cycling them. */
+.topbar .provider-logo-container {
+  position: static;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  gap: 14px;
+  background: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.topbar .ldl-provider-logo {
+  max-width: none;
+  max-height: 52px;
+}
+
+/* LDL brand rail while the top bar holds the clock and logo: just the 3 hour radar. */
+.ldl-rail-radar {
+  display: none;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 0 72px 0;
+  box-sizing: border-box;
+}
+
+:root.topbar-filled .ldl-rail-radar {
+  display: flex;
+}
+
+.ldl-rail-radar-title {
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin: 0 18px 8px 0;
+  font-size: var(--text-xs);
+  line-height: 1;
+  color: rgba(226, 241, 255, 0.62);
+}
+
+/* The map has a notch cut out of its bottom right: from halfway along the bottom edge it curves up by
+   --notch-height, then runs flat to the right edge. The clock sits in the notch. */
+.ldl-rail-radar-frame {
+  --notch-height: 60px;
+  --notch-curve: 48px; /* width of the S-curve up from the bottom edge */
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Mask layers: everything above the notch, the left half beside it, and the curve, drawn by the SVG
+   (opaque left of an S from bottom left to top right) and placed with its left edge at 50%.
+   The 1px overlaps stop seams between layers. */
+#ldl-rail-radar-map {
+  flex: 1 1 auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--notch-height) + 1px) no-repeat,
+    linear-gradient(#000 0 0) left bottom / calc(50% + 1px) var(--notch-height) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 60' preserveAspectRatio='none'%3E%3Cpath d='M0 0H48C24 0 24 60 0 60Z'/%3E%3C/svg%3E")
+      calc(50% + var(--notch-curve) / 2) bottom / var(--notch-curve) var(--notch-height) no-repeat;
+}
+
+.ldl-rail-radar-clock {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: calc(45% + var(--notch-curve));
+  height: var(--notch-height);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+  font-size: var(--text-sm);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 1px;
+  white-space: pre;
+  font-variant-numeric: tabular-nums;
+}

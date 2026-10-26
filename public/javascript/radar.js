@@ -91,7 +91,9 @@ export class RadarMap {
         const container = this.#getContainer();
         if (!container) return;
 
-        this.#resizeObserver = new ResizeObserver((entries) => {
+        // Acts on the next frame: creating or resizing the map inside the callback changes the observed
+        // layout again and raises "ResizeObserver loop completed with undelivered notifications".
+        this.#resizeObserver = new ResizeObserver((entries) => requestAnimationFrame(() => {
             for (const entry of entries) {
                 const { width, height } = entry.contentRect;
                 if (width === 0 || height === 0) continue;
@@ -108,7 +110,7 @@ export class RadarMap {
                     this.#map.resize();
                 }
             }
-        });
+        }));
 
         this.#resizeObserver.observe(container);
     }

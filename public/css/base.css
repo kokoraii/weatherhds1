@@ -60,6 +60,15 @@
   --text-2xl: 48pt;
   --text-3xl: 72pt;
   --sidebar-rail-width: max(576px, 2vw);
+  /* Layout. Heights are shares of the 1440px view; the content area takes whatever is left. */
+  --ldl-base-height: 26.087%; /* the LDL itself */
+  --cityticker-height: 46px; /* the ticker strip sits on top of the LDL's main column, on top of the base height */
+  --ldl-height: calc(var(--ldl-base-height) + var(--cityticker-height));
+  --topbar-height: 128px; /* bar reaches the top edge; its content sits at the bottom, inside the safe area */
+  /* Main presentation side spacing: gutter outside .slides-block, padding inside it. The top bar's content
+     uses the sum so it lines up with the slides. */
+  --presentation-gutter: 2%;
+  --presentation-pad: 4%;
 
   /* Gradients */
   --gradient-base: linear-gradient(180deg, var(--color-bg), var(--color-surface));
@@ -136,7 +145,7 @@ body.performance-static-glass {
   flex-direction: row;
   align-items: stretch;
   justify-content: flex-end;
-  flex: 0.85 1 0;
+  flex: 1 1 0;
   min-height: 0;
   position: relative;
   width: 100%;
@@ -145,12 +154,23 @@ body.performance-static-glass {
 .slides-block {
   display: flex;
   flex-direction: column;
-  width: 96%;
+  width: calc(100% - 2 * var(--presentation-gutter));
   flex: 1 1 0;
   min-height: 0;
 	box-sizing: border-box;
   margin: 1% auto;
-  padding-right: 4%;
+  padding-right: var(--presentation-pad);
+}
+
+/* Sidebar off (html.sidebar-off, set by layout.js): taller LDL, and the main presentation centred
+   with 2% more room on each side (gutter 2% -> 4%, padding on both sides). */
+:root.sidebar-off {
+  --ldl-base-height: calc(26.087% + 2%);
+  --presentation-gutter: 4%;
+}
+
+:root.sidebar-off .slides-block {
+  padding-left: var(--presentation-pad);
 }
 
 .main-block {
@@ -218,6 +238,7 @@ body.performance-static-glass .radar-info-bubble,
 body.performance-static-glass .bumper-background-metadata,
 body.performance-static-glass .bumper-background-canvas,
 body.performance-static-glass .ldl-weather,
+body.performance-static-glass .topbar,
 body.performance-static-glass .ldl-carousel-current,
 body.performance-static-glass .ldl-date-time-container,
 body.performance-static-glass .cityticker,
@@ -279,6 +300,7 @@ body.performance-cached-glass .main-slide-panel,
 body.performance-cached-glass .main-current-condtions-box,
 body.performance-cached-glass .radar-info-bubble,
 body.performance-cached-glass .ldl-weather,
+body.performance-cached-glass .topbar,
 body.performance-cached-glass .cityticker,
 body.performance-cached-glass .ldl-bulletin-crawl,
 body.performance-cached-glass .ldl-carousel-container,
@@ -294,6 +316,7 @@ body.performance-cached-glass .national-current-labels {
 }
 
 body.performance-cached-glass .ldl-weather,
+body.performance-cached-glass .topbar,
 body.performance-cached-glass .sidebar {
   background-image: linear-gradient(180deg, rgba(2, 8, 18, 0.72), rgba(2, 8, 18, 0.58)), var(--cached-glass-bg) !important;
 }

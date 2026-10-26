@@ -1,4 +1,5 @@
 .agents
+.claude
 /node_modules
 /persistentCache/
 .env

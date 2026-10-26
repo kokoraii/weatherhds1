@@ -143,7 +143,7 @@
 
 /* LDL MAIN CONTAINER */
 .ldl-weather {
-  flex: 0.30 0 0;
+  flex: 0 0 var(--ldl-height);
   align-self: stretch;
   position: relative;
   z-index: 487845785;
@@ -276,7 +276,8 @@
   flex-direction: column;
   min-width: 0;
   width: auto;
-  height: 75%;
+  /* 75% of the LDL proper plus the ticker on top; the bottom 25% stays clear as safe area. */
+  height: calc((100% - var(--cityticker-height)) * 0.75 + var(--cityticker-height));
   width: 85%;
   overflow: hidden;
   container: ldl-main / inline-size;
@@ -284,13 +285,14 @@
 
 /* BULLETIN/ALERTS */
 
+/* Top strip of the LDL's main column (beside the brand rail). */
 .cityticker {
   position: sticky;
   width: 100%;
-  height: 46px;
+  height: var(--cityticker-height);
   background: var(--gradient-raised);
   display: flex;
-  flex: 1 1 1;
+  flex: 0 0 var(--cityticker-height);
   flex-direction: row;
   align-items: center;
   color: var(--text);

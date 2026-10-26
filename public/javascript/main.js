@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { fetchOnlineBackground } from "./data.js";
 import "./glass_cache.js";
+import { sidebarEnabled } from "./layout.js";
 
 const performanceConfig = config.performance ?? {};
 const liveBlurParam = new URLSearchParams(window.location.search).get('liveBlur');
@@ -221,6 +222,11 @@ function presentationType() {
     if (providerLogo !== null) {
         const parsed = providerLogo.toLowerCase() === 'true';
         config.presentationConfig.providerLogo = parsed;
+    }
+
+    // sidebar.js starts nothing when the sidebar is off; this just takes it out of the layout.
+    if (!sidebarEnabled) {
+        document.querySelector('.sidebar').style.display = 'none';
     }
 
     if (config.presentationConfig.providerLogo != true) {

@@ -12,6 +12,7 @@ const GLASS_SELECTOR = [
     ".main-current-condtions-box",
     ".radar-info-bubble",
     ".ldl-weather",
+    ".topbar",
     ".ldl-date-time-container",
     ".provider-logo-container",
     ".cityticker",

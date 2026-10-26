@@ -357,6 +357,12 @@ class CityTickerScroller {
         this.#cancelAnimations();
         this.track.innerHTML = "";
 
+        // Hidden (no width): every slide would take 0ms and the loop would spin, so idle until it shows.
+        if (!this.viewport.offsetWidth) {
+            await this.#sleep(1000);
+            return;
+        }
+
         let header = null;
         let entries;
         if (seg.type === "entries") {
