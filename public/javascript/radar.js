@@ -42,13 +42,11 @@ async function fetchTimeslices(apiKey, totalFrames, product = "twcRadarHcMosaic"
     if (!res.ok) throw new Error(`Timeslice fetch failed: ${res.status}`);
     const data = await res.json();
 
-    const products = {
-        "radar": "radar",
-        "twcRadarHcMosaic": "radar",
-        "twcRadarMosaic": "radar",
-        "satrad": "satrad",
-    };
-    return data.seriesInfo[products[product]].series.reverse().slice(0, totalFrames);
+    // Each product publishes its own series. Use the tile product's, not "radar": the mosaics lag it
+    // by a few minutes, so its newest timestamps would be "Future tile" (HTTP 400) for them.
+    const series = data.seriesInfo[product]?.series;
+    if (!series) throw new Error(`No timeslice series for product ${product}`);
+    return series.slice(0, totalFrames).reverse();
 }
 
 export class RadarMap {
