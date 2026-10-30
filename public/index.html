@@ -18,6 +18,8 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+        <!-- Before the modules: stationid.js uses the global videojs at load. -->
+        <script src="https://cdn.jsdelivr.net/npm/video.js@8.10.0/dist/video.min.js" defer></script>
         <script type="module" src="javascript/weather.js" defer></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
         <script type="module" src="javascript/slides.js?v=upnext-2" defer></script>
@@ -56,6 +58,8 @@
             </div>
 
             <div class="wallpaper"></div>
+            <!-- Station ID clip, driven by video.js from stationid.js; fades in over the wallpaper during the station ID. -->
+            <video id="station-id-video" class="station-id-video" muted playsinline></video>
 
 
             <div class="content-area">
@@ -176,14 +180,19 @@
                         <div class="bumper-slides">
                             <div id="stationid" class="bumper-slide">
                                 <div class="station-id-slide">
+                                    <span id="station-id-copyright" class="station-id-copyright"></span>
                                     <div class="station-id-hdsinfo">
                                         <img class="station-id-hds-logo" src="/images/hdslogo_2024.png" alt="WeatherHDS">
                                         <span id="station-id-hdsver" class="station-id-version"></span>
                                     </div>
-                                    <img class="station-id-network-logo" id="station-id-network-logo" src="" alt="">
-                                    <div class="station-id-lower">
-                                        <div class="station-id-provider" id="station-id-provider"></div>
-                                        <div class="station-id-channel" id="station-id-channel"></div>
+                                    <div class="station-id-header">
+                                        <span class="station-id-blurb" id="station-id-blurb"></span>
+                                    </div>
+                                    <div class="station-id-body">
+                                        <img class="station-id-network-logo" id="station-id-network-logo" src="" alt="">
+                                    </div>
+                                    <div class="station-id-footer">
+                                        <div class="station-id-providers" id="station-id-providers"></div>
                                     </div>
                                 </div>
                             </div>
@@ -594,9 +603,7 @@
                         <div id="ldl-date" class="ldl-date">Wed May 13, 2026</div>
                     </div>
                     <div class="provider-logo-container">
-                        <span id="ldl-provider-extratext-heading" class="ldl-provider-extratext"></span>
                         <img id="ldl-provider-logo" class="ldl-provider-logo" src="" alt="Provider logo">
-                        <span id="ldl-provider-extratext-tailing" class="ldl-provider-extratext"></span>
                     </div>
                     <!-- Only with the top bar's content showing (topbar.js), in place of the clock and logo. -->
                     <div class="ldl-rail-radar">
