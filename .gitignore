@@ -13,5 +13,6 @@ weatherhds.exe
 /bin/
 /resource_windows_amd64.syso
 /build/windows/weatherhds.ico
-/public/audio/vocallocal/
+/public/audio/vocallocal/*
+!/public/audio/vocallocal/Allen
 dist/

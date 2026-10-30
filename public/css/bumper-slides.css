@@ -1,17 +1,29 @@
 /* BUMPER SLIDES DISPLAY CONTROL */
 #national { display: none; }
-#stationid { display: none; }
+#stationid { display: flex; }
 
-/* STATION ID SLIDE */
+/* STATION ID SLIDE
+   stationid.js adds .station-id-slide--revealed one second into the clip. Then the accent bar grows
+   from 0 to full height; three quarters of the way in, the network logo slides out from under the bar;
+   then the blurb rises out of the header's bottom edge, just above the body, and the provider logo
+   drops out of the footer's top edge, just below it. With several providers, stationid.js moves
+   .is-active between their logos. */
 .station-id-slide {
+  --sid-bar-width: 16px;
+  --sid-bar-ms: 600ms;
+  --sid-logo-ms: 650ms;
+  --sid-blurb-ms: 550ms;
+  --sid-provider-fade-ms: 350ms;
+  --sid-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   width: 100%;
   height: 100%;
   gap: 18px;
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.60)) drop-shadow(2px 2px 6px rgb(0, 0, 0));
 }
 
 .station-id-hdsinfo {
@@ -21,53 +33,158 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  opacity: 0.45;
+  opacity: 0.76;
+  
+}
+
+/* Mirrors .station-id-hdsinfo on the left; the line-height matches its 32px logo row so the text lines
+   up with the version. */
+.station-id-copyright {
+  position: absolute;
+  top: 28px;
+  left: 36px;
+  line-height: 32px;
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  opacity: 0.76;
+}
+
+/* Clipped only at its left edge, so the logo stays hidden until it passes under the bar. */
+.station-id-body {
+  position: relative;
+  height: 30%;
+  width: 120%;
+  display: flex;
+  align-items: center;
+  padding-left: calc(var(--sid-bar-width) * 2);
+  clip-path: inset(-100vh -100vw -100vh 0);
+}
+
+.station-id-body::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--sid-bar-width);
+  background: var(--color-accent-sharp);
+  z-index: 1;
+  transform: scaleY(0);
+}
+
+/* Clipped only at its bottom edge, so the blurb rises out of it. */
+.station-id-header {
+  clip-path: inset(-100vh -100vw 0 -100vw);
+}
+
+/* Clipped only at its top edge, so the provider logos drop out of it. */
+.station-id-footer {
+  clip-path: inset(0 -100vw -100vh -100vw);
 }
 
 .station-id-hds-logo {
-  height: 28px;
+  height: 32px;
   width: auto;
   object-fit: contain;
 }
 
 .station-id-version {
   font-size: var(--text-2xs);
-  font-weight: 300;
+  font-weight: 500;
   letter-spacing: 0.06em;
   color: var(--text-soft);
 }
 
+.station-id-blurb {
+  display: block;
+  font-size: var(--text-2xl);
+  margin-left: 48px;
+  transform: translateY(100%);
+}
+
 .station-id-network-logo {
-  max-width: 42%;
-  max-height: 28%;
+  max-width: 65%;
   width: auto;
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 4px 24px rgba(0,0,0,0.5));
+  transform: translateX(calc(-100% - var(--sid-bar-width) * 2));
 }
 
-.station-id-lower {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+.station-id-providers {
+  display: grid;
+  justify-items: start;
+  margin-left: 48px;
+  transform: translateY(-100%);
 }
 
-.station-id-provider {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--text-soft);
+/* All stacked in one cell. A logo losing .is-active fades out right away; the one gaining it fades in
+   once that is done (the delay only applies on the way in). */
+.station-id-provider-logo {
+  grid-area: 1 / 1;
+  height: 120px;
+  width: auto;
+  opacity: 0;
+  transition: opacity var(--sid-provider-fade-ms) ease;
 }
 
-.station-id-channel {
-  font-size: var(--text-xs);
-  font-weight: 300;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-  opacity: 0.6;
+.station-id-provider-logo.is-active {
+  opacity: 1;
+  transition-delay: var(--sid-provider-fade-ms);
+}
+
+.station-id-slide--revealed .station-id-body::before {
+  animation: stationIdBarGrow var(--sid-bar-ms) var(--sid-ease) both;
+}
+
+.station-id-slide--revealed .station-id-network-logo {
+  animation: stationIdLogoIn var(--sid-logo-ms) var(--sid-ease) calc(var(--sid-bar-ms) * 0.75) both;
+}
+
+.station-id-slide--revealed .station-id-blurb {
+  animation: stationIdSlideY var(--sid-blurb-ms) var(--sid-ease) calc(var(--sid-bar-ms) * 0.75 + var(--sid-logo-ms) * 0.6) both;
+}
+
+.station-id-slide--revealed .station-id-providers {
+  animation: stationIdSlideY var(--sid-blurb-ms) var(--sid-ease) calc(var(--sid-bar-ms) * 0.75 + var(--sid-logo-ms) * 0.6 + 100ms) both;
+}
+
+@keyframes stationIdBarGrow {
+  to { transform: scaleY(1); }
+}
+
+@keyframes stationIdLogoIn {
+  to { transform: translateX(0); }
+}
+
+/* Blurb and providers: each starts tucked past its wrapper's clipped edge. */
+@keyframes stationIdSlideY {
+  to { transform: translateY(0); }
+}
+
+/* The clip layer in .view: video.js wraps the <video> in a div that keeps its id and classes. Selected by id
+   so it beats the width/height video.js injects for that wrapper. Above .wallpaper, below everything else. */
+#station-id-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 500ms ease;
+  pointer-events: none;
+}
+
+#station-id-video.is-playing {
+  opacity: 1;
+}
+
+#station-id-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* BUMPER PRESENTATION */
@@ -80,6 +197,7 @@
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  display: flex;
 }
 
 .bumper-slide {

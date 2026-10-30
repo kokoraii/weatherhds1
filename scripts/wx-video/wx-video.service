@@ -1,0 +1,33 @@
+[Unit]
+Description=wx-video display (Chromium: SD on the APU HDMI, HD on another output)
+Wants=network-online.target user@1000.service
+After=network-online.target systemd-user-sessions.service user@1000.service
+# If localhost:3000 is served by another unit, start after it too, e.g.:
+# After=my-app.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+Type=simple
+# The script finds rai's PipeWire through SUDO_UID; the browsers run as that user.
+Environment=SUDO_UID=1000
+Environment=HOME=/root
+# Wait (up to 30s) for rai's PipeWire/PulseAudio socket; never block boot on it.
+ExecStartPre=/usr/bin/bash -c 'for i in $$(seq 1 30); do [ -S /run/user/1000/pulse/native ] && exit 0; sleep 1; done; exit 0'
+# Both feeds share one X server on tty1 (see the script docstring).
+# --no-hd runs SD only (HD browser and output off). To bring HD back, drop it and add
+# --hd-sink alsa_output.pci-0000_0a_00.1.pro-output-3 (the HD feed's audio when it shares the APU).
+# APU audio uses the Pro Audio profile: pro-output-7 is the HDMI pin (SD), pro-output-3 the DisplayPort pin (HD).
+ExecStart=/usr/bin/python3 /usr/local/sbin/start_display_kiosk.py --vt 1 --sd-sink alsa_output.pci-0000_0a_00.1.pro-output-7 --no-hd
+Restart=always
+RestartSec=5
+TTYPath=/dev/tty1
+StandardInput=tty
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -136,7 +136,6 @@ body.performance-static-glass {
   display: flex;
   flex-direction: column;
   height: 1440px;
-  overflow: hidden;
   position: relative;
 }
 
@@ -180,7 +179,6 @@ body.performance-static-glass {
   min-width: 0;
   min-height: 0;
   align-self: stretch;
-  overflow: hidden;
   margin-top: 0.8%;
 }
 

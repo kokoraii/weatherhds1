@@ -98,45 +98,11 @@ const ldlDomCache = Object.freeze({
 const activeProviders = Object.values(brand.providers ?? {}).filter(p => p.showOnLDLDur !== null);
 
 const ldlProviderLogoEl = document.getElementById('ldl-provider-logo');
-const ldlProviderHeadingEl = document.getElementById('ldl-provider-extratext-heading');
-const ldlProviderTailingEl = document.getElementById('ldl-provider-extratext-tailing');
-
-function applyProviderExtraText(extraText, fade) {
-    const els = [ldlProviderHeadingEl, ldlProviderTailingEl];
-    if (fade) {
-        els.forEach(el => el?.classList.add('fading'));
-        return;
-    }
-    if (!extraText) {
-        if (ldlProviderHeadingEl) ldlProviderHeadingEl.textContent = '';
-        if (ldlProviderTailingEl) ldlProviderTailingEl.textContent = '';
-        return;
-    }
-    const applyStyle = el => {
-        el.style.fontFamily = extraText.font ?? 'inherit';
-        el.style.fontStyle = extraText.style ?? 'normal';
-        el.style.fontWeight = extraText.weight ?? '400';
-        el.style.fontSize = extraText.size ?? '0.8em';
-        el.style.textShadow = extraText.shadow ?? 'none';
-    };
-    if (ldlProviderHeadingEl) {
-        ldlProviderHeadingEl.textContent = extraText.heading ?? '';
-        applyStyle(ldlProviderHeadingEl);
-        ldlProviderHeadingEl.classList.remove('fading');
-    }
-    if (ldlProviderTailingEl) {
-        ldlProviderTailingEl.textContent = extraText.tailing ?? '';
-        applyStyle(ldlProviderTailingEl);
-        ldlProviderTailingEl.classList.remove('fading');
-    }
-}
-
 function initProviderLogoCycler() {
     if (!ldlProviderLogoEl || activeProviders.length === 0) return;
 
     const setProvider = (provider) => {
         ldlProviderLogoEl.src = provider.providerLogo;
-        applyProviderExtraText(provider.extraText ?? null, false);
     };
 
     setProvider(activeProviders[0]);
@@ -147,7 +113,6 @@ function initProviderLogoCycler() {
 
     const cycleToNext = () => {
         ldlProviderLogoEl.classList.add('fading');
-        applyProviderExtraText(null, true);
 
         setTimeout(() => {
             providerIndex = (providerIndex + 1) % activeProviders.length;

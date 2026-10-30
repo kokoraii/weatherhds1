@@ -1,10 +1,11 @@
-import { config, locationConfig, versionID, serverConfig, bumperBackgroundsRandom, brand } from "../config.js";
+import { config, locationConfig, serverConfig, bumperBackgroundsRandom, brand } from "../config.js";
 import { appendDatatoMain, animateIntraday, daypartNames, getShortTermPeriodCount, renderShortTermPeriod, runShortTermProduct, stopShortTermProduct } from "./weather.js";
 import { serverHealth } from "./data.js";
 import { runRegionalPlayback } from "./national.js";
 import { resizeRadar } from "./radar.js";
 import { getVocallocalQueueForSlide, getVocallocalTotalDurationMsForSlide, isVocallocalEnabled } from "./vocallocal.js";
 import { startMarquee, stopMarquee } from "./marquee.js";
+import { startStationId, endStationId } from "./stationid.js";
 
 const playlistSettings = {
     defaultAnimationIn: `mainPresentationSlideIn 500ms ease-in-out`,
@@ -135,7 +136,6 @@ const domCache = {
     regionalSlides: document.getElementsByClassName('national-slides')[0],
     bumperSlides: document.getElementsByClassName('bumper-slides')[0],
     radarDiv: document.getElementById('radar'),
-    stationIdHdsver: document.getElementById('station-id-hdsver'),
     wallpaper: document.getElementsByClassName('wallpaper')[0],
     slideInfoIcon: document.getElementById('slide-info-icon'),
     slideInfoName: document.getElementById('slide-info-name'),
@@ -163,26 +163,6 @@ const domCache = {
     bumperBgAuthor: document.getElementById('bumper-bg-author'),
     radarInfoBubble: document.getElementById('radar-info-bubble'),
 };
-
-domCache.stationIdHdsver.innerText = versionID;
-
-const stationIdNetworkLogo = document.getElementById('station-id-network-logo');
-const stationIdProvider = document.getElementById('station-id-provider');
-const stationIdChannel = document.getElementById('station-id-channel');
-
-if (stationIdNetworkLogo && brand?.networkLogo) stationIdNetworkLogo.src = brand.networkLogo;
-if (stationIdNetworkLogo && brand?.networkName) stationIdNetworkLogo.alt = brand.networkName;
-
-const firstProviderEntry = brand?.providers ? Object.entries(brand.providers)[0] : null;
-if (firstProviderEntry) {
-    const [providerName, providerData] = firstProviderEntry;
-    if (stationIdProvider) stationIdProvider.textContent = providerName;
-    const vt = config.videoType === 'auto' ? 'hdtv' : config.videoType;
-    const channelEntry = providerData.channels
-        ? Object.values(providerData.channels).find(c => c.videoType === vt) ?? Object.values(providerData.channels)[0]
-        : null;
-    if (stationIdChannel && channelEntry) stationIdChannel.textContent = channelEntry.label ?? '';
-}
 
 const { radarDiv, regionalSlides, slideInfoIcon, slideInfoName, slideProgressBar } = domCache;
 
@@ -612,8 +592,11 @@ async function playVocallocalForSlide(slideId, queueKey = null) {
     }
 }
 
+const BUMPER_OUT_MS = 500; // a bumper starts sliding out this long before it ends
+
+// onStart(onAirMs) runs as the bumper comes on, with how long until it starts sliding out; onEnd runs as it does.
 const bumperDefs = {
-    stationID:         { htmlID: "stationid", title: "Welcome!",            duration: 10000, isRegional: false },
+    stationID:         { htmlID: "stationid", title: "Welcome!",            duration: 10000, isRegional: false, onStart: startStationId, onEnd: endStationId },
     regionalBumper:    { htmlID: "national",  title: "National Weather",    duration: 12000, isRegional: true  },
     USARegionalBumper: { htmlID: "national",  title: "US National Weather", duration: 12000, isRegional: true  },
 };
@@ -1243,6 +1226,7 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
         el.style.display = "block";
         el.style.animation = playlistSettings.defaultAnimationIn;
     }
+    def.onStart?.(def.duration - BUMPER_OUT_MS);
 
     slideInfoName.textContent = def.title;
     slideInfoName.style.cssText = 'display:block;animation:switchModules 300ms ease-in-out forwards';
@@ -1308,9 +1292,10 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
 
     slideNearEnd = setTimeout(() => {
         if (el) el.style.animation = playlistSettings.defaultAnimationOut;
+        def.onEnd?.();
         slideInfoName.style.animation = 'fadeModule 0.5s ease-in-out forwards';
         slideInfoIcon.style.animation = 'slideDown 160ms ease-in-out forwards';
-    }, def.duration - 500);
+    }, def.duration - BUMPER_OUT_MS);
 
     slideEnd = setTimeout(() => {
         slideInfoName.style.display = 'none';

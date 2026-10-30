@@ -4,22 +4,9 @@ export let brand = {
     "networkName": "METEOchannel",
     "networkLogo": "/images/meteoch.png",
     "providers": { // where we are carried
-        "Mist Weather Media": { // main sponsor
-            "providerLogo": "/images/providers/mistlogo2026site.webp",
+        "Mist Live": { // main sponsor
+            "providerLogo": "/images/providers/MistLiveLogo.svg",
             "showOnLDLDur": 120, // how long to show the provider logo on the ldl in seconds. set to 0 to always show, and set to null to never show.
-            "channels": {
-              "sspwxr01": { "videoType": "hdtv", "label": "METEOchannel in HD" }, // shows a specific channel ID and label depending on the current videoType.
-              "sspwxr02": { "videoType": "vga", "label": "METEOchannel in SD" },
-            },
-            "extraText": { // throw this text either before or after the provider logo on the LDL.
-              "heading": null,
-              "tailing": "weather media",
-              "font": "Arial, sans-serif",
-              "style": "italic", // normal, italic, or oblique
-              "weight": "600", // normal is 400, bold is 700, you can also use numeric values from 100 to 900.
-              "size": "1em",
-              "shadow": "4px 5px 1px rgba(0, 0, 0, 0.45)" // text-shadow for the extra text, in CSS format. if null, no shadow will be applied.
-            }
         },
     }
 }
@@ -142,8 +129,8 @@ export let config = {
           {
             "messageHeader": "CABLE CONTRIBUTES TO LIFE...",
             "messageBody": "By paying your cable bill each month, you support our programming. Thank you!",
-            "showBeforeProduct": "currentConditions", // which product to show the message before. options are the same as the products array above.
-            "showAfterProduct": null, // which product to show the message after. options are the same as the products array above. if null, it will just show the message before the specified product and then continue with the normal ticker content.
+            "showBeforeProduct": null, // which product to show the message before. options are the same as the products array above.
+            "showAfterProduct": "dayTwo", // which product to show the message after. options are the same as the products array above. if null, it will just show the message before the specified product and then continue with the normal ticker content.
             "scroll": true, // whether or not to scroll the message across the ticker. if false, it will just show the message in place of the normal ticker content for 15 seconds.
             "displayInterval": 2 // show this message every x cycles of the city ticker. so if you have 3 products in the ticker and this message is set to show before dayOne, and the displayInterval is set to 2, then it will show this message before dayOne every 2 cycles of the ticker. so it would show before dayOne on the first cycle, then not show on the second cycle, then show again on the third cycle, and so on.
           }
@@ -162,6 +149,7 @@ export let config = {
   
 export const locationConfig = {
   mainBlockPlaylist: [ // this determines the order of playlists to show on the main block (large block covering most of the screen). it will cycle through each playlist in order, showing the location(s) specified by the index for 12 seconds before moving on to the next one. if a playlist has fewer locations than the specified index, it will loop back to the beginning of that playlist.
+    { playlist: "bumper", bumperId: "stationID", index: 0 }, // station ID graphic indicates a new cycle of the program.
     { playlist: "primary", index: 0 }, // plays the first primary location found in localLocations
     { playlist: "secondary", index: 0 }, // plays the first set of secondary locations
     //  { playlist: "primary", index: 1 }, // plays the second primary location found in localLocations, if it exists. if not, ignores and moves on to the next item in the playlist.
@@ -176,7 +164,6 @@ export const locationConfig = {
     { playlist: "national", regionId: "Midwest", index: 0 },
     { playlist: "national", regionId: "South", index: 0 },
     { playlist: "national", regionId: "West", index: 0 },
-    { playlist: "bumper", bumperId: "stationID", index: 0 }, // station ID graphic indicates a new cycle of the program.
   ],
 
   localLocations: [
@@ -519,9 +506,42 @@ export const bumperBackgroundsRandom = {
       url: "/images/national_bg_images/vic_harbour2.webp"
     }
   ],
-  "stationId": [],
+  "stationId": [ // clips for the station ID, one picked at random each time (never the same twice in a row). they loop if shorter than the slide.
+    "/videos/stationId/bird.webm",
+    "/videos/stationId/city.webm",
+    "/videos/stationId/clouds.webm",
+    "/videos/stationId/falls.webm",
+    "/videos/stationId/forest.webm",
+    "/videos/stationId/frozen.webm",
+    "/videos/stationId/marina.webm",
+    "/videos/stationId/pollution.webm",
+    "/videos/stationId/prarie.webm",
+    "/videos/stationId/tronto.webm",
+    "/videos/stationId/waterbird.webm",
+    "/videos/stationId/waterywheat.webm",
+    "/videos/stationId/wheat.webm",
+    "/videos/stationId/zachnettv_lol.webm",
+  ],
   "local": [],
   "special": []
+}
+
+export const stationIdBlurbs = {
+  "openers": [ // shown above the network logo on the station ID, one picked at random each time.
+    "Keep up with the weather on",
+    "Don't touch that dial, or I'll touch you first; live on",
+    "Didn't you see the news today?", // IM FLAVORING MY FOLEY
+    "Good morning! Afternoon! Or wherever you are.",
+    "didy foid 😂✌️",
+    "Love is always love",
+    "Better than Weatherscan, because unlike Weatherscaan, meteochannel is not discontinued.",
+    "npm install opsec",
+    "Here is your weather my"
+  ],
+  "openersSevere": [
+    "Stay safe, stay on",
+    "For more information, stay on"
+  ],
 }
 
 export const weatherIcons = {
@@ -602,13 +622,11 @@ export const holidayMapping = {
     "11-06": { name: "Fall Clock Change", color0: "#b3ad00", color1: "#b3ad00", icon: "", banner: "" },
     "11-11": { name: "Remembrance Day (CA) / Veterans Day (US)", color0: "#8a3030", color1: "#8a3032", icon: "", banner: "" },
     "11-23": { name: "Thanksgiving (US)", color0: "#ff9933", color1: "#663300", icon: "", banner: "" },
-    "12-06": { name: "First Day of Hanukkah", color0: "#dead39", color1: "#dead39", icon: "", banner: "" },
+    "12-04": { name: "First Day of Hanukkah", color0: "#dead39", color1: "#dead39", icon: "", banner: "" },
     "12-21": { name: "First Day of Winter", color0: "#0e105d", color1: "#0e105d", icon: "", banner: "" },
     "12-24": { name: "Christmas Eve", color0: "#be312a", color1: "#be312a", icon: "", banner: "" },
     "12-25": { name: "Christmas Day", color0: "#008000", color1: "#ff0000", icon: "", banner: "" },
     "12-31": { name: "New Year's Eve", color0: "#d4aa45", color1: "#d4aa45", icon: "", banner: "" }
 }
 
-
-
-export const versionID = '26.10.25';
+export const versionID = '26.10.29';

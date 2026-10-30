@@ -5,6 +5,9 @@
     flex: 1;
     overflow: hidden;
     clip-path: inset(-60px 0 -60px 0);
+    border-bottom: var(--border-subtle);
+    letter-spacing: -1.5px;
+    word-spacing: 2px;
 }
 
 .cityticker-track {
@@ -104,7 +107,6 @@
     white-space: nowrap;
     color: var(--text-soft);
     font-weight: 400;
-    letter-spacing: 0.3px;
 }
 
 .cityticker-header--message {
