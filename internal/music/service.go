@@ -68,11 +68,13 @@ type Service struct {
 	stateDetail string
 	clients     map[*client]struct{}
 
+	normalizer *normalizer // nil unless WithLoudness is set and ffmpeg is available
+
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-func NewService(musicDir string, log Logger) (*Service, error) {
+func NewService(musicDir string, log Logger, opts ...Option) (*Service, error) {
 	if log == nil {
 		log = func(string, ...any) {}
 	}
@@ -80,7 +82,7 @@ func NewService(musicDir string, log Logger) (*Service, error) {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Service{
+	s := &Service{
 		musicDir: musicDir,
 		log:      log,
 		rng:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // playlist shuffle only
@@ -88,7 +90,11 @@ func NewService(musicDir string, log Logger) (*Service, error) {
 		clients:  make(map[*client]struct{}),
 		ctx:      ctx,
 		cancel:   cancel,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s, nil
 }
 
 func (s *Service) Start(parent context.Context) {
@@ -242,6 +248,9 @@ func (s *Service) nextTrack() (Track, bool) {
 	}
 	track := s.deck[0]
 	s.deck = s.deck[1:]
+	if s.normalizer != nil && len(s.deck) > 0 {
+		go s.normalizer.prefetch(s.ctx, s.deck[0].path) // measure the next track while this one plays
+	}
 	s.mu.Unlock()
 
 	probed, err := probeTrack(s.musicDir, track.path)
@@ -274,6 +283,9 @@ func (s *Service) setEmpty(message string) {
 }
 
 func (s *Service) playTrack(track Track) error {
+	if filter, ok := s.loudnessFilter(track); ok {
+		return s.playFFmpegProcess(track, filter)
+	}
 	if !isOggOpusExtension(filepath.Ext(track.path)) {
 		return s.playNativeTrack(track)
 	}

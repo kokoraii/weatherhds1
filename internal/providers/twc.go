@@ -81,7 +81,9 @@ func (t *TWCClient) LoadLocaleData(ctx context.Context, location string) (Locale
 	return result, nil
 }
 
-func (t *TWCClient) LoadWeatherData(ctx context.Context, postalKey string, geocode string, locType string) (CachedWeatherData, error) {
+func (t *TWCClient) LoadWeatherData(ctx context.Context, locale LocaleData, locType string) (CachedWeatherData, error) {
+	postalKey := locale.PostalKey
+	geocode := locale.geocode()
 	baseKey := fmt.Sprintf("wxData-%s:%s", postalKey, geocode)
 	cacheKey := fmt.Sprintf("%s:%s", baseKey, locType)
 	if hit, ok := t.cache.Get(cacheKey); ok {
@@ -136,18 +138,13 @@ func (t *TWCClient) LoadWeatherData(ctx context.Context, postalKey string, geoco
 	return data, nil
 }
 
-func (t *TWCClient) FetchAlertSingleLocation(ctx context.Context, geocode string, next string) (map[string]any, int, error) {
-	cacheKey := fmt.Sprintf("alert-%s-%s", geocode, next)
-	if cacheKey == fmt.Sprintf("alert-%s-", geocode) {
-		cacheKey = fmt.Sprintf("alert-%s-none", geocode)
-	}
+func (t *TWCClient) FetchAlerts(ctx context.Context, locale LocaleData) (map[string]any, int, error) {
+	geocode := locale.geocode()
+	cacheKey := fmt.Sprintf("alert-%s-none", geocode)
 	if hit, ok := t.cache.Get(cacheKey); ok {
 		return hit.(map[string]any), http.StatusOK, nil
 	}
 	requestURL := fmt.Sprintf("https://api.weather.com/v3/alerts/headlines?geocode=%s&language=%s&format=json&apiKey=%s", geocode, t.systemLocale, t.apiKey)
-	if next != "" {
-		requestURL += "&next=" + url.QueryEscape(next)
-	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
 		return nil, 0, err

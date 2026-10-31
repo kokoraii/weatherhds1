@@ -3,6 +3,7 @@ import { config, locationConfig, serverConfig, weatherIcons, displayUnits, brand
 import { formatTime } from './weather.js';
 import { startMarquee } from './marquee.js'
 import { weatherIconUrl } from './icons.js'
+import { scrollOverflowByLine } from './autoscroll.js'
 
 const ldlPresentationSlides = {
     "0": { htmlID: "ldl-current",        durationMS: 15000, label: 'Now' },
@@ -192,6 +193,7 @@ function staggerInX(els, step = 55) {
 
 let shorttermPeriods = []
 let shorttermPagerTimeout = null
+let stopShorttermNarrativeScroll = () => {}
 let carouselCurrentX = 0
 let carouselTailIndex = 0
 let lastWindAngle = 0
@@ -481,16 +483,28 @@ function appendLDLShortterm() {
     if (shorttermPeriods.length > 0) renderShorttermPeriod(shorttermPeriods[0])
 }
 
+// Fits the shown narrative to the strip and scrolls it by line when it runs longer. Needs the slide
+// visible, so it runs from the pager rather than from renderShorttermPeriod.
+function scrollShorttermNarrative(durationMs) {
+    stopShorttermNarrativeScroll()
+    const container = ldlDomCache.shorttermContainer
+    if (!container) return
+    const narrative = container.querySelector('#ldl-shortterm-period-narrative0')
+    stopShorttermNarrativeScroll = scrollOverflowByLine(narrative, container, durationMs)
+}
+
 function runShorttermPager() {
     if (shorttermPagerTimeout) {
         clearTimeout(shorttermPagerTimeout)
         shorttermPagerTimeout = null
     }
-    if (shorttermPeriods.length <= 1) return
 
     const slideConfig = Object.values(ldlPresentationSlides).find(s => s.htmlID === 'ldl-shortterm')
     const durationMS = slideConfig?.durationMS ?? 24000
-    const perPeriod = Math.floor(durationMS / shorttermPeriods.length)
+    const perPeriod = Math.floor(durationMS / Math.max(1, shorttermPeriods.length))
+
+    scrollShorttermNarrative(perPeriod) // the first period was rendered before the slide was shown
+    if (shorttermPeriods.length <= 1) return
 
     let index = 0
 
@@ -507,6 +521,7 @@ function runShorttermPager() {
 
         setTimeout(() => {
             renderShorttermPeriod(shorttermPeriods[index])
+            scrollShorttermNarrative(perPeriod - 200)
             container.style.transform = 'translateX(24px)'
             container.style.transition = 'none'
             void container.offsetWidth
@@ -1157,9 +1172,10 @@ function showLDLSlide() {
     setTimeout(() => triggerExitAnimation(slide.htmlID), duration - 1000)
 
     setTimeout(() => {
-        if (slide.htmlID === 'ldl-shortterm' && shorttermPagerTimeout) {
+        if (slide.htmlID === 'ldl-shortterm') {
             clearTimeout(shorttermPagerTimeout)
             shorttermPagerTimeout = null
+            stopShorttermNarrativeScroll()
         }
         nextLDLSlide()
     }, duration)

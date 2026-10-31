@@ -399,7 +399,7 @@ export class RadarMap {
     }
 }
 
-const mainRadar = new RadarMap("radar", {
+const mainRadar = new RadarMap("radar-map", {
     timeElement: document.getElementById("main-radar-time"),
 });
 
