@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,7 +19,6 @@ import (
 	"time"
 
 	"weatherhds/internal/music"
-	"weatherhds/internal/providers"
 	"weatherhds/internal/vocallocal"
 
 	"github.com/joho/godotenv"
@@ -38,7 +38,6 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	}
 	_ = godotenv.Load(runtimePaths.EnvPath)
 	twcAPIKey := strings.TrimSpace(os.Getenv("TWC_API_KEY"))
-	twcEnabled := twcAPIKey != ""
 	cfg := loadConfig(runtimePaths.ConfigPath)
 	publicDir := runtimePaths.PublicDir
 	versionID := loadVersionFromConfig(runtimePaths.ConfigPath)
@@ -47,9 +46,6 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	logInfo(logger, "server", "WeatherHDS Server v%s", versionID)
 	logInfo(logger, "server", "Created by raiii. (c) SSPWXR/raii 2025")
 	logInfo(logger, "server", "User contributors: ScentedOrangeDev, LeWolfYt,")
-	if !twcEnabled {
-		logInfo(logger, "server", "NO API KEY PRESENT! PLEASE ENTER A WEATHER.COM API KEY...")
-	}
 	localeCache, err := NewPersistentLocaleCache(workspaceDir)
 	if err != nil {
 		return err
@@ -63,20 +59,26 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 			IdleConnTimeout:     90 * time.Second,
 		},
 	}
-	twc := providers.NewTWCClient(client, twcAPIKey, "en-US", cfg.Units, localeCache, ttlCache, func(format string, args ...any) {
-		if strings.HasPrefix(format, "Cache hit") || strings.HasPrefix(format, "Returned cache key") {
-			return
-		}
-		logInfo(logger, "providers/twc", format, args...)
-	})
+	weather, err := newProvider(cfg.DataProvider, twcAPIKey, cfg.Units, client, localeCache, ttlCache, logger)
+	if err != nil {
+		return err
+	}
 	backgrounds := NewBackgroundManager(publicDir)
 	vocalLocalService, err := vocallocal.NewService(publicDir)
 	if err != nil {
 		return err
 	}
+	loudness, normalize, err := music.ParseStandard(cfg.MusicLoudness)
+	if err != nil {
+		return err
+	}
+	var musicOptions []music.Option
+	if normalize {
+		musicOptions = append(musicOptions, music.WithLoudness(loudness, filepath.Join(workspaceDir, "persistentCache", "music-loudness.json")))
+	}
 	musicService, err := music.NewService(filepath.Join(workspaceDir, "Music"), func(format string, args ...any) {
 		logInfo(logger, "music", format, args...)
-	})
+	}, musicOptions...)
 	if err != nil {
 		return err
 	}
@@ -120,16 +122,15 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 		return c.String(http.StatusOK, "ARE YOU HAVE STUPID??? YOU ARE SUPOSED TO AD PARAMTER LIKE /data/MEMPHOS?loctype=primary!!!!!")
 	})
 	e.GET("/data/alerts/:location", func(c echo.Context) error {
-		if !twcEnabled {
-			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "TWC_API_KEY is not configured"})
+		location, err := locationParam(c)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
 		}
-		location := c.Param("location")
-		localeData, err := twc.LoadLocaleData(c.Request().Context(), location)
+		localeData, err := weather.LoadLocaleData(c.Request().Context(), location)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Error fetching alert data"})
 		}
-		geocode := fmt.Sprintf("%v,%v", localeData.Lat, localeData.Lon)
-		alertData, statusCode, err := twc.FetchAlertSingleLocation(c.Request().Context(), geocode, "")
+		alertData, statusCode, err := weather.FetchAlerts(c.Request().Context(), localeData)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Error fetching alert data"})
 		}
@@ -139,10 +140,10 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 		return c.JSON(http.StatusOK, alertData)
 	})
 	e.GET("/data/:location", func(c echo.Context) error {
-		if !twcEnabled {
-			return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "TWC_API_KEY is not configured"})
+		location, err := locationParam(c)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
 		}
-		location := c.Param("location")
 		locType := c.QueryParam("locType")
 		requestContext := c.Request().Context()
 		if strings.Contains(location, "|") || strings.Contains(location, ";") {
@@ -153,16 +154,15 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 			parts := strings.Split(location, delimiter)
 			combined := make([]map[string]any, 0, len(parts))
 			for _, part := range parts {
-				localeData, err := twc.LoadLocaleData(requestContext, strings.TrimSpace(part))
+				localeData, err := weather.LoadLocaleData(requestContext, strings.TrimSpace(part))
 				if err != nil {
 					return c.String(http.StatusInternalServerError, err.Error())
 				}
-				geocode := fmt.Sprintf("%v,%v", localeData.Lat, localeData.Lon)
 				resolvedLocType := locType
 				if resolvedLocType == "" {
 					resolvedLocType = "primary"
 				}
-				wxData, err := twc.LoadWeatherData(requestContext, localeData.PostalKey, geocode, resolvedLocType)
+				wxData, err := weather.LoadWeatherData(requestContext, localeData, resolvedLocType)
 				if err != nil {
 					return c.String(http.StatusInternalServerError, err.Error())
 				}
@@ -170,15 +170,14 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 			}
 			return c.JSON(http.StatusOK, combined)
 		}
-		localeData, err := twc.LoadLocaleData(requestContext, location)
+		localeData, err := weather.LoadLocaleData(requestContext, location)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
 		if locType == "" {
 			return c.JSON(http.StatusBadRequest, map[string]any{"error": true, "comment": "Please add a locType query"})
 		}
-		geocode := fmt.Sprintf("%v,%v", localeData.Lat, localeData.Lon)
-		wxData, err := twc.LoadWeatherData(requestContext, localeData.PostalKey, geocode, locType)
+		wxData, err := weather.LoadWeatherData(requestContext, localeData, locType)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
@@ -327,9 +326,17 @@ func loadConfig(configPath string) AppConfig {
 		if value := extractJSInt(serverConfig, "cacheValidTime"); value > 0 {
 			cfg.CacheValidTime = value
 		}
+		cfg.DataProvider = extractJSString(serverConfig, "dataProvider")
+		cfg.MusicLoudness = extractJSString(serverConfig, "musicLoudness")
 	}
 	if value := strings.TrimSpace(os.Getenv("UNITS")); value != "" {
 		cfg.Units = value
+	}
+	if value := strings.TrimSpace(os.Getenv("DATA_PROVIDER")); value != "" {
+		cfg.DataProvider = value
+	}
+	if value := strings.TrimSpace(os.Getenv("MUSIC_LOUDNESS")); value != "" {
+		cfg.MusicLoudness = value
 	}
 	if value := strings.TrimSpace(os.Getenv("WEB_PORT")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
@@ -401,6 +408,16 @@ func isCacheableStaticPath(path string) bool {
 	default:
 		return false
 	}
+}
+
+// locationParam returns the :location route param decoded. Echo routes on the raw path once it holds
+// escapes (encodeURIComponent turns "Saskatoon, SK" into "Saskatoon%2C%20SK"), so params arrive encoded.
+func locationParam(c echo.Context) (string, error) {
+	location, err := url.PathUnescape(c.Param("location"))
+	if err != nil {
+		return "", fmt.Errorf("invalid location: %w", err)
+	}
+	return location, nil
 }
 
 func jsonDecode(response *http.Response, target any) error {

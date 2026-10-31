@@ -92,7 +92,7 @@ export async function requestAlertData(location) {
       `/data/alerts/${encodeURIComponent(location)}`
     );
 
-    if (typeof rawAlertData === 'string') {
+    if (rawAlertData === null || typeof rawAlertData === 'string') { // null = 204, no active alerts
       return null;
     }
 

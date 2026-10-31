@@ -68,7 +68,7 @@ export let config = {
         "name": "en_us-hfc_male-medium",
         "rate": -2,
         "pitch": 3,
-        "volume": 80
+        "volume": 50
       },
       "verbosity": {
         "forecast": 1,
@@ -400,8 +400,10 @@ export const locationConfig = {
 
 export const serverConfig = {
   "units": "m", // m for metric, e for imperial, h for hybrid, and s for metric SI
+  "dataProvider": "", // "twc" (weather.com, needs TWC_API_KEY), "openmeteo" (free, no key, but no alerts), or "" to use twc when a key is set and openmeteo otherwise.
   "webPort": 3000,
   "cacheValidTime": 720, //in seconds
+  "musicLoudness": "ebu-r128", // loudness the music is normalised to: "ebu-r128" (-23 LUFS, -1 dBTP), "atsc-a85" (-24 LKFS, -2 dBTP), "streaming" (-14 LUFS, -1 dBTP), or "off". Needs ffmpeg in PATH.
   "alertPollIntervalNormal": 30, // in minutes
   "alertPollIntervalSevere": 12, // in minutes, how often to poll for severe weather alerts when there is an active severe alert in the area.
 }

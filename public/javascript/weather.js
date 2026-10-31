@@ -484,6 +484,7 @@ export async function appendDatatoMain(locale, locType) {
 
         const dataMapCurrent = {
             "main-current-condition": current.wxPhraseLong,
+            "main-current-windvalue": current.windSpeed === 0 ? 'Calm' : `${current.windDirectionCardinal}, ${current.windSpeed} ${endingWind}`,
             "main-current-temp": { html: formatTemp(current.temperature) },
             "main-current-sunrise-value": formatTime(current.sunriseTimeLocal),
             "main-current-sunset-value": formatTime(current.sunsetTimeLocal),
@@ -566,36 +567,36 @@ export async function appendDatatoMain(locale, locType) {
         const dataMapExtended = {
         "forecast-day3-title": forecast.daypart[0].daypartName[4],
         "forecast-day3-condition": forecast.daypart[0].wxPhraseShort[4],
-        "forecast-day3-high": `${forecast.calendarDayTemperatureMax[3]}`,
-        "forecast-day3-low": `${forecast.calendarDayTemperatureMin[3]}`,
+        "forecast-day3-high": `${forecast.calendarDayTemperatureMax[2]}`,
+        "forecast-day3-low": `${forecast.calendarDayTemperatureMin[2]}`,
         "forecast-day3-wind": `${forecast.daypart[0].windDirectionCardinal[4]} ${forecast.daypart[0].windSpeed[4]}${endingWind}`,
         "forecast-day3-pop": `${forecast.daypart[0].precipChance[4]}%`,
 
         "forecast-day4-title": forecast.daypart[0].daypartName[6],
         "forecast-day4-condition": forecast.daypart[0].wxPhraseShort[6],
-        "forecast-day4-high": `${forecast.calendarDayTemperatureMax[4]}`,
-        "forecast-day4-low": `${forecast.calendarDayTemperatureMin[4]}`,
+        "forecast-day4-high": `${forecast.calendarDayTemperatureMax[3]}`,
+        "forecast-day4-low": `${forecast.calendarDayTemperatureMin[3]}`,
         "forecast-day4-wind": `${forecast.daypart[0].windDirectionCardinal[6]} ${forecast.daypart[0].windSpeed[6]}${endingWind}`,
         "forecast-day4-pop": `${forecast.daypart[0].precipChance[6]}%`,
 
         "forecast-day5-title": forecast.daypart[0].daypartName[8],
         "forecast-day5-condition": forecast.daypart[0].wxPhraseShort[8],
-        "forecast-day5-high": `${forecast.calendarDayTemperatureMax[5]}`,
-        "forecast-day5-low": `${forecast.calendarDayTemperatureMin[5]}`,
+        "forecast-day5-high": `${forecast.calendarDayTemperatureMax[4]}`,
+        "forecast-day5-low": `${forecast.calendarDayTemperatureMin[4]}`,
         "forecast-day5-wind": `${forecast.daypart[0].windDirectionCardinal[8]} ${forecast.daypart[0].windSpeed[8]}${endingWind}`,
         "forecast-day5-pop": `${forecast.daypart[0].precipChance[8]}%`,
 
         "forecast-day6-title": forecast.daypart[0].daypartName[10],
         "forecast-day6-condition": forecast.daypart[0].wxPhraseShort[10],
-        "forecast-day6-high": `${forecast.calendarDayTemperatureMax[6]}`,
-        "forecast-day6-low": `${forecast.calendarDayTemperatureMin[6]}`,
+        "forecast-day6-high": `${forecast.calendarDayTemperatureMax[5]}`,
+        "forecast-day6-low": `${forecast.calendarDayTemperatureMin[5]}`,
         "forecast-day6-wind": `${forecast.daypart[0].windDirectionCardinal[10]} ${forecast.daypart[0].windSpeed[10]}${endingWind}`,
         "forecast-day6-pop": `${forecast.daypart[0].precipChance[10]}%`,
 
         "forecast-day7-title": forecast.daypart[0].daypartName[12],
         "forecast-day7-condition": forecast.daypart[0].wxPhraseShort[12],
-        "forecast-day7-high": `${forecast.calendarDayTemperatureMax[7]}`,
-        "forecast-day7-low": `${forecast.calendarDayTemperatureMin[7]}`,
+        "forecast-day7-high": `${forecast.calendarDayTemperatureMax[6]}`,
+        "forecast-day7-low": `${forecast.calendarDayTemperatureMin[6]}`,
         "forecast-day7-wind": `${forecast.daypart[0].windDirectionCardinal[12]} ${forecast.daypart[0].windSpeed[12]}${endingWind}`,
         "forecast-day7-pop": `${forecast.daypart[0].precipChance[12]}%`
         };

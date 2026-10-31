@@ -878,9 +878,17 @@
   letter-spacing: 0.001em;
   font-size: var(--text-lg);
   width: 85%;
+  align-self: flex-start; /* top-aligned: the strip's bottom edge is hidden by the LDL, so this fits a third line */
 }
 .ldl-shortterm-period-title {
   border-bottom: 0.8px solid var(--color-accent-dim);
+}
+/* ldl.js fits this to the lines the strip holds and scrolls it a line at a time when a forecast runs long. */
+#ldl-shortterm-period-narrative0 {
+  display: block;
+  overflow: hidden;
+  box-sizing: content-box;
+  padding-bottom: 0.1em; /* keeps the bottom line's descenders inside the clip */
 }
 .ldl-shortterm-icon {
   width: 96px;

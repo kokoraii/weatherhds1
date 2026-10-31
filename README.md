@@ -77,9 +77,11 @@ python scripts/svg2avif.py</pre>
 <h3>Server Configuration</h3>
 <ul>
   <li><code>units</code>: Measurement units (e.g., "m" for metric, "e" for imperial).</li>
+  <li><code>dataProvider</code>: Where weather data comes from. <code>twc</code> uses weather.com and needs <code>TWC_API_KEY</code> in <code>.env</code>. <code>openmeteo</code> uses the free <a href="https://open-meteo.com">Open-Meteo</a> APIs with no key, but has no weather alerts, no cloud ceiling, and no pollen outside Europe. Left empty, it uses <code>twc</code> when a key is set and <code>openmeteo</code> otherwise. Can also be set with the <code>DATA_PROVIDER</code> environment variable. The radar still loads from weather.com and needs the key either way.</li>
   <li><code>webPort</code>: Port for the web server (default 3000).</li>
   <li>The admin panel listens separately on port <code>1005</code>.</li>
   <li><code>cacheValidTime</code>: Time in seconds to cache weather data.</li>
+  <li><code>musicLoudness</code>: Loudness the background music is normalised to: <code>ebu-r128</code> (-23 LUFS, -1 dBTP), <code>atsc-a85</code> (-24 LKFS, -2 dBTP), <code>streaming</code> (-14 LUFS, -1 dBTP) or <code>off</code>. Each track is measured once (cached in <code>persistentCache/music-loudness.json</code>) and played with a constant gain plus a true-peak limiter when needed. It re-encodes every track through the <code>ffmpeg</code> executable, which must be in PATH; without it the music plays unprocessed. Can also be set with the <code>MUSIC_LOUDNESS</code> environment variable.</li>
 </ul>
 
 <h3>URL parameters </h3>

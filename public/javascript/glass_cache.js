@@ -10,7 +10,6 @@ const GLASS_SELECTOR = [
     ".main-upnext-carousel-entry",
     ".main-slide-panel",
     ".main-current-condtions-box",
-    ".radar-info-bubble",
     ".ldl-weather",
     ".topbar",
     ".ldl-date-time-container",

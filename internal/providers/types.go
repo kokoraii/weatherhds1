@@ -1,5 +1,7 @@
 package providers
 
+import "fmt"
+
 type LocaleData struct {
 	LocaleName    string  `json:"localeName"`
 	AdminDistrict string  `json:"adminDistrict"`
@@ -8,6 +10,11 @@ type LocaleData struct {
 	Lat           float64 `json:"lat"`
 	Lon           float64 `json:"lon"`
 	PostalKey     string  `json:"postalKey"`
+}
+
+// geocode formats the coordinates as the "lat,lon" pair TWC endpoints expect.
+func (l LocaleData) geocode() string {
+	return fmt.Sprintf("%v,%v", l.Lat, l.Lon)
 }
 
 type CachedWeatherData map[string]any

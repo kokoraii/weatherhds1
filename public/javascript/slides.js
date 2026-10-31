@@ -161,7 +161,6 @@ const domCache = {
     bumperBgTitle: document.getElementById('bumper-bg-title'),
     bumperBgSubtitle: document.getElementById('bumper-bg-subtitle'),
     bumperBgAuthor: document.getElementById('bumper-bg-author'),
-    radarInfoBubble: document.getElementById('radar-info-bubble'),
 };
 
 const { radarDiv, regionalSlides, slideInfoIcon, slideInfoName, slideProgressBar } = domCache;
@@ -829,17 +828,10 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
             playVocallocalForSlide(slide.htmlID, targetVocallocalGroup);
         }
 
-        if (slide.htmlID === 'radar') {
-            domCache.radarInfoBubble?.classList.add('radar-bubble--active');
-        } else {
-            domCache.radarInfoBubble?.classList.remove('radar-bubble--active');
-        }
-
         slideNearEnd = setTimeout(() => {
             if (el) el.style.animation = slide.animationOut;
             slideInfoName.style.animation = 'fadeModule 0.5s ease-in-out forwards';
             slideInfoIcon.style.animation = 'slideDown 160ms ease-in-out forwards';
-            domCache.radarInfoBubble?.classList.remove('radar-bubble--active');
         }, slideDurationMS - 500);
 
         slideEnd = setTimeout(() => {
