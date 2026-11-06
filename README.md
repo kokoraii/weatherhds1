@@ -1,104 +1,115 @@
-<img src="https://github.com/meowraii/weatherhds1/blob/master/public/images/hdslogo_2024.png">
-<body>
-  <h1>WeatherHDS (Weather HTML Display System)</h1>
+![WeatherHDS logo](https://github.com/meowraii/weatherhds1/blob/master/public/images/hdslogo_2024.png)
 
-  <img src="https://github.com/meowraii/weatherhds1/blob/master/public/images/hds_screenshots.jpg">
+# WeatherHDS (Weather HTML Display System)
 
-  <h2>Present continuous weather data on display screens, with easy deployment and free and open source software.</h2>
-  <p>WeatherHDS is a Go app that simplifies the presentation of modern and updated weather graphics on digital displays or other types of broadcasts. Designed with modularity and infinite customizability in mind, thanks to WeatherHDS's simplified underlying system completely built on standard web technologies.</p>
+![WeatherHDS screenshots](https://github.com/meowraii/weatherhds1/blob/master/public/images/hds_screenshots.jpg)
 
-  <h1>Building</h1>
-  <p>Requires Go 1.26.3 or newer. To build, run <code>go build -o weatherhds</code> in the project root. The executable will just simply appear.</p>
-  <p>The music streamer plays Ogg Opus directly. Other common audio formats and video containers with audio tracks are decoded and transcoded to Opus by FFmpeg. The standard Go build uses the <code>ffmpeg</code> executable from PATH for these files. The Windows portable build uses the native FFmpeg libraries by default and requires the MSYS2 CLANG64 FFmpeg development libraries; use <code>scripts/build-windows.ps1 -MediaBackend builtin</code> to build without those libraries. FFmpeg cannot play files with no audio stream, and supported codecs depend on the installed FFmpeg build.</p>
-  <h3>Downloads</h3>
-  <ul>
-    <li>Download stable versions from the <a href="https://github.com/meowraii/weatherhds1/releases">Releases page</a>.</li>
-    <li>Download development nightly builds from <a href="https://github.com/meowraii/weatherhds1/actions">GitHub Actions</a>.</li>
-  </ul>
+## Present continuous weather data on display screens, with easy deployment and free and open source software.
 
-  <h1>Configuration</h1>
-  <p>Main presentation, LDL locations, and system settings can be edited in <code>public/config.js</code>. Always restart the server for config changes!</p>
-  <p>The system rotates between locations once the last slide of the presentation is reached, it should loop back on the next location.</p>
-  <p>slides.js manages how the slides work. Currently, it switches between the HTML containers every 8 to 10 seconds.</p>
-  <p>The alerts page will show an intro slide whenever there are no alerts in effect.</p>
+WeatherHDS is a Go app that simplifies the presentation of modern and updated weather graphics on digital displays or other types of broadcasts. Designed with modularity and infinite customizability in mind, thanks to WeatherHDS's simplified underlying system completely built on standard web technologies.
 
-  <h1>Features</h1>
-  <ul>
-    <li>Built and designed for developers to adapt and improve the system.</li>
-    <li>Completely customizable locations, no automatic geolocation (public/config.js)</li>
-    <li>Switching between 4:3 (VGA), 16:9 (HDTV), 16:10 (Tablet), and 3:2 (NTSC DV) aspect ratios. Rendered at canvas sizes of 640x480, 854x480, 768x480 and 720x480 respectively, scaled to fit the viewport. This is controlled by `videoType` in the config.js file.</li>
-    <li>LDL only mode. Displays a black screen with only the LDL, which you could superimpose onto programming with OBS Studio. This is controlled by `presentationType` in the config.js file.</li>
-    <li>Switching between metric and imperial. (public/config.js)</li>
-    <li>Switching between static and animated weather icons. (public/config.js)</li>
-  </ul>
+## Building
 
-<h1>Config</h1>
-<p>All configuration is now located in <code>public/config.js</code>.</p>
+Requires Go 1.26.3 or newer. To build, run `go build -o weatherhds` in the project root. The executable will just simply appear.
 
-<h3>Global Configuration</h3>
-<ul>
-  <li><code>networkName</code>: Network name used on the station ID card.</li>
-  <li><code>affiliateName</code>: Affiliate name used on the station ID card.</li>
-  <li><code>channelNumber</code>: Channel ID/number used on the station ID card.</li>
-  <li><code>videoBackgrounds</code>: Enables or disables the video backgrounds on the current conditions slide.</li>
-  <li><code>currentConditionsGradient</code>: Enables a background gradient on the current conditions slide based on time relative to sunrise or sunset.</li>
-  <li><code>staticIcons</code>: If true, uses non-animated weather icons.</li>
-  <li><code>animatedIconFormat</code>: Format of the animated weather icons: <code>svg</code> (default, SMIL-animated, from <code>public/graphics/smil</code>) or <code>avif</code> (pre-rendered animated AVIF from <code>public/graphics/avif</code>, see below). Icons without a converted file fall back to their SVG.</li>
-  <li><code>ldlClock</code>: In LDL-only mode, shows or hides the clock and network logo on the LDL.</li>
-  <li><code>presentationConfig</code>: Object containing slide and display mode toggles.
-    <ul>
-      <li><code>main</code>: Toggle main presentation.</li>
-      <li><code>ldl</code>: Toggle LDL.</li>
-      <li><code>ldlClock</code>: Toggle LDL clock.</li>
-      <li><code>ldlBack</code>: Toggle LDL background.</li>
-      <li><code>backgrounds</code>: Toggle backgrounds.</li>
-      <li><code>repeatMain</code>: Loop main presentation.</li>
-      <li><code>squareLogo</code>: Toggle square logo.</li>
-      <li><code>bannerLogo</code>: Toggle banner logo.</li>
-      <li><code>autorunOnStartup</code>: Auto-start presentation. Similar to toggling MAIN off.</li>
-    </ul>
-  </li>
-  <li><code>videoType</code>: Aspect ratio mode. (options: <code>vga</code>, <code>ntsc</code>, <code>hdtv</code>, <code>tablet</code>).</li>
-  <li><code>systemTimeZone</code>: Time zone in <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">tz_database</a> format.</li>
-  <li><code>tickerContent</code>: Text for the scrolling crawl on the LDL; empty string hides the crawl.</li>
-  <li><code>overrideBackgroundImage</code>: URL to a custom background image; skips background rotation.</li>
-  <li><code>backgroundSource</code>: <code>local</code> for bundled backgrounds, <code>online</code> for Bing image API backgrounds.</li>
-  <li><code>verboseLogging</code>: Enables or disables extra console logging.</li>
-  <li><code>refreshInterval</code>: How often to refresh the browser tab, in minutes.</li>
-</ul>
+The music streamer plays Ogg Opus directly. Other common audio formats and video containers with audio tracks are decoded and transcoded to Opus by FFmpeg. The standard Go build uses the `ffmpeg` executable from PATH for these files. The Windows portable build uses the native FFmpeg libraries by default and requires the MSYS2 CLANG64 FFmpeg development libraries; use `scripts/build-windows.ps1 -MediaBackend builtin` to build without those libraries. FFmpeg cannot play files with no audio stream, and supported codecs depend on the installed FFmpeg build.
 
-<h3>Animated AVIF icons</h3>
-<p>The animated SVG icons are drawn by the browser's SMIL engine on the main thread, which can be heavy on weak hardware. <code>scripts/svg2avif.py</code> pre-renders the SVGs in <code>public/graphics/smil</code> to animated, transparent AVIF files in <code>public/graphics/avif</code>:</p>
-<pre>pip install pillow playwright
-python scripts/svg2avif.py</pre>
-<p>Then set <code>animatedIconFormat</code> to <code>"avif"</code> in <code>public/config.js</code> and restart. It renders each frame in your installed Edge or Chrome (or <code>playwright install chromium</code>) and works out every icon's loop length from its SVG timing, so loops are seamless. Useful flags: <code>--size</code> (default 160), <code>--fps</code> (default 20), <code>--quality</code>, <code>--force</code>, <code>--jobs</code>. Run <code>python scripts/svg2avif.py --help</code> for all of them.</p>
-<p>The animated weather backgrounds in <code>public/images/avif</code> are decoded on the CPU frame by frame too. <code>python scripts/shrink_backgrounds.py</code> (needs ffmpeg with libsvtav1) re-encodes them in place to 540 px tall at 30 fps, which matches the panels they fill; it skips files already that small, so new backgrounds can be dropped in and the script re-run.</p>
+### Downloads
 
-<h3>Server Configuration</h3>
-<ul>
-  <li><code>units</code>: Measurement units (e.g., "m" for metric, "e" for imperial).</li>
-  <li><code>dataProvider</code>: Where weather data comes from. <code>twc</code> uses weather.com and needs <code>TWC_API_KEY</code> in <code>.env</code>. <code>openmeteo</code> uses the free <a href="https://open-meteo.com">Open-Meteo</a> APIs with no key, but has no weather alerts, no cloud ceiling, and no pollen outside Europe. Left empty, it uses <code>twc</code> when a key is set and <code>openmeteo</code> otherwise. Can also be set with the <code>DATA_PROVIDER</code> environment variable. The radar still loads from weather.com and needs the key either way.</li>
-  <li><code>webPort</code>: Port for the web server (default 3000).</li>
-  <li>The admin panel listens separately on port <code>1005</code>.</li>
-  <li><code>cacheValidTime</code>: Time in seconds to cache weather data.</li>
-  <li><code>musicLoudness</code>: Loudness the background music is normalised to: <code>ebu-r128</code> (-23 LUFS, -1 dBTP), <code>atsc-a85</code> (-24 LKFS, -2 dBTP), <code>streaming</code> (-14 LUFS, -1 dBTP) or <code>off</code>. Each track is measured once (cached in <code>persistentCache/music-loudness.json</code>) and played with a constant gain plus a true-peak limiter when needed. It re-encodes every track through the <code>ffmpeg</code> executable, which must be in PATH; without it the music plays unprocessed. Can also be set with the <code>MUSIC_LOUDNESS</code> environment variable.</li>
-</ul>
+- Download stable versions from the [Releases page](https://github.com/meowraii/weatherhds1/releases).
+- Download development nightly builds from [GitHub Actions](https://github.com/meowraii/weatherhds1/actions).
 
-<h3>URL parameters </h3>
-<i>Example: <code>http://localhost:3000/?videoType=hdtv&ldl=true&background=true</code></i>
-<ul>
-  <li><code>videoType</code>: Sets the video type. Please see entry #3 of features.</li>
-  <li><code>main</code>: Enables/disables main presentation mode.</li>
-  <li><code>ldl</code>: Enables/disables LDL mode.</li>
-  <li><code>backgrounds</code>: Enables/disables backgrounds in the presentation.</li>
-  <li><code>repeatMain</code>: When true, loops the main presentation.</li>
-  <li><code>ldlClock</code>: Toggles the LDL clock independently of global <code>ldlClock</code> setting.</li>
-</ul>
-<p></p>
-  <h1>Credits</h1>
-    <p>Credit to ScentedOrange for making the air quality and 7 day high and low pages. | https://github.com/ScentedOrangeDEV</p>
-    <p>Credit to LeWolfYT for providing solutions to issues regarding the 7 day highs and the LDL progress bars | https://github.com/LeWolfYT</p>
-  <p>Weather icons (MIT): https://github.com/basmilius/weather-icons | Copy of license included in weather icon directory</p>
-  <p>Google Material icons (APACHE 2.0): https://fonts.google.com/icons | https://www.apache.org/licenses/LICENSE-2.0</p>
-  <p>weather videos (Pexels): https://www.pexels.com/license/</p>
-</body>
+## Configuration
+
+Main presentation, LDL locations, and system settings can be edited in `public/config.js`. Always restart the server for config changes!
+
+The system rotates between locations once the last slide of the presentation is reached, it should loop back on the next location.
+
+`slides.js` manages how the slides work. Currently, it switches between the HTML containers every 8 to 10 seconds.
+
+The alerts page will show an intro slide whenever there are no alerts in effect.
+
+## Features
+
+- Built and designed for developers to adapt and improve the system.
+- Completely customizable locations, no automatic geolocation (`public/config.js`)
+- Switching between 4:3 (VGA), 16:9 (HDTV), 16:10 (Tablet), and 3:2 (NTSC DV) aspect ratios. Rendered at canvas sizes of 640x480, 854x480, 768x480 and 720x480 respectively, scaled to fit the viewport. This is controlled by `videoType` in the config.js file.
+- LDL only mode. Displays a black screen with only the LDL, which you could superimpose onto programming with OBS Studio. This is controlled by `presentationType` in the config.js file.
+- Switching between metric and imperial. (`public/config.js`)
+- Switching between static and animated weather icons. (`public/config.js`)
+
+## Config
+
+All configuration is now located in `public/config.js`.
+
+### Global Configuration
+
+- `networkName`: Network name used on the station ID card.
+- `affiliateName`: Affiliate name used on the station ID card.
+- `channelNumber`: Channel ID/number used on the station ID card.
+- `videoBackgrounds`: Enables or disables the video backgrounds on the current conditions slide.
+- `currentConditionsGradient`: Enables a background gradient on the current conditions slide based on time relative to sunrise or sunset.
+- `staticIcons`: If true, uses non-animated weather icons.
+- `animatedIconFormat`: Format of the animated weather icons: `svg` (default, SMIL-animated, from `public/graphics/smil`) or `avif` (pre-rendered animated AVIF from `public/graphics/avif`, see below). Icons without a converted file fall back to their SVG.
+- `ldlClock`: In LDL-only mode, shows or hides the clock and network logo on the LDL.
+- `presentationConfig`: Object containing slide and display mode toggles.
+  - `main`: Toggle main presentation.
+  - `ldl`: Toggle LDL.
+  - `ldlClock`: Toggle LDL clock.
+  - `ldlBack`: Toggle LDL background.
+  - `backgrounds`: Toggle backgrounds.
+  - `repeatMain`: Loop main presentation.
+  - `squareLogo`: Toggle square logo.
+  - `bannerLogo`: Toggle banner logo.
+  - `autorunOnStartup`: Auto-start presentation. Similar to toggling MAIN off.
+- `videoType`: Aspect ratio mode. (options: `vga`, `ntsc`, `hdtv`, `tablet`).
+- `systemTimeZone`: Time zone in [tz_database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) format.
+- `tickerContent`: Text for the scrolling crawl on the LDL; empty string hides the crawl.
+- `overrideBackgroundImage`: URL to a custom background image; skips background rotation.
+- `backgroundSource`: `local` for bundled backgrounds, `online` for Bing image API backgrounds.
+- `verboseLogging`: Enables or disables extra console logging.
+- `refreshInterval`: How often to refresh the browser tab, in minutes.
+
+### Animated AVIF icons
+
+The animated SVG icons are drawn by the browser's SMIL engine on the main thread, which can be heavy on weak hardware. `scripts/svg2avif.py` pre-renders the SVGs in `public/graphics/smil` to animated, transparent AVIF files in `public/graphics/avif`:
+
+```bash
+pip install pillow playwright
+python scripts/svg2avif.py
+```
+
+Then set `animatedIconFormat` to `"avif"` in `public/config.js` and restart. It renders each frame in your installed Edge or Chrome (or `playwright install chromium`) and works out every icon's loop length from its SVG timing, so loops are seamless. Useful flags: `--size` (default 160), `--fps` (default 20), `--quality`, `--force`, `--jobs`. Run `python scripts/svg2avif.py --help` for all of them.
+
+The animated weather backgrounds in `public/images/avif` are decoded on the CPU frame by frame too. `python scripts/shrink_backgrounds.py` (needs ffmpeg with libsvtav1) re-encodes them in place to 540 px tall at 30 fps, which matches the panels they fill; it skips files already that small, so new backgrounds can be dropped in and the script re-run.
+
+### Server Configuration
+
+- `units`: Measurement units (e.g., `"m"` for metric, `"e"` for imperial).
+- `dataProvider`: Where weather data comes from. `twc` uses weather.com and needs `TWC_API_KEY` in `.env`. `openmeteo` uses the free [Open-Meteo](https://open-meteo.com) APIs with no key, but has no weather alerts, no cloud ceiling, and no pollen outside Europe. Left empty, it uses `twc` when a key is set and `openmeteo` otherwise. Can also be set with the `DATA_PROVIDER` environment variable. The radar still loads from weather.com and needs the key either way.
+- `webPort`: Port for the web server (default 3000).
+- The admin panel listens separately on port `1005`.
+- `cacheValidTime`: Time in seconds to cache weather data.
+- `musicLoudness`: Loudness the background music is normalised to: `ebu-r128` (-23 LUFS, -1 dBTP), `atsc-a85` (-24 LKFS, -2 dBTP), `streaming` (-14 LUFS, -1 dBTP) or `off`. Each track is measured once (cached in `persistentCache/music-loudness.json`) and played with a constant gain plus a true-peak limiter when needed. It re-encodes every track through the `ffmpeg` executable, which must be in PATH; without it the music plays unprocessed. Can also be set with the `MUSIC_LOUDNESS` environment variable.
+
+### URL parameters
+
+*Example: `http://localhost:3000/?videoType=hdtv&ldl=true&background=true`*
+
+- `videoType`: Sets the video type. Please see entry #3 of features.
+- `main`: Enables/disables main presentation mode.
+- `ldl`: Enables/disables LDL mode.
+- `backgrounds`: Enables/disables backgrounds in the presentation.
+- `repeatMain`: When true, loops the main presentation.
+- `ldlClock`: Toggles the LDL clock independently of global `ldlClock` setting.
+
+## LLM Assistance Disclaimer
+WeatherHDS was programmed with the assistance of a Large Language Model (LLM). If you do not like this, then do not use the program... or do. Whatever you want, because I don't really care.
+
+## Credits
+
+- Credit to ScentedOrange for making the air quality and 7 day high and low pages. | https://github.com/ScentedOrangeDEV
+- Credit to LeWolfYT for providing solutions to issues regarding the 7 day highs and the LDL progress bars | https://github.com/LeWolfYT
+- Weather icons (MIT): https://github.com/basmilius/weather-icons | Copy of license included in weather icon directory
+- Google Material icons (APACHE 2.0): https://fonts.google.com/icons | https://www.apache.org/licenses/LICENSE-2.0
+- Weather videos (Pexels): https://www.pexels.com/license/
