@@ -8,7 +8,8 @@ const perf = config.performance ?? {};
 const iconDir = config.staticIcons ? "static" : "smil";
 
 const radarInstance = new RadarMap('sidebar-radar-map', {
-    totalFrames:  Number(perf.sidebarRadarFrames ?? 24),
+    layers:       config.radar.layers.sidebar,
+    totalFrames:  Number(perf.sidebarRadarFrames ?? 36),
     frameDelay:   Number(perf.radarFrameDelay ?? 150),
     loopGap:      2000,
     maxLoops:     Number(perf.sidebarRadarLoops ?? Infinity),
@@ -169,7 +170,7 @@ async function refreshSidebar() {
     const lon = wxData?.metadata?.localeData?.lon ?? null;
 
     if (lat && lon) {
-        await radarInstance.init(lat, lon, 6, 'satrad');
+        await radarInstance.init(lat, lon, 6);
         requestAnimationFrame(() => radarInstance.resize());
     }
 

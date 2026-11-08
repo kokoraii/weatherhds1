@@ -42,10 +42,49 @@ export let config = {
       "forecastTextSlideMs": 220,
       "mainRadarFrames": 48,
       "mainRadarLoops": 12,
-      "sidebarRadarFrames": 24,
+      "sidebarRadarFrames": 36, // 3 hours of 5 minute radar frames, to match its "past 3 hours" title.
       "sidebarRadarLoops": Infinity,
+      "nationalRadarFrames": 16, // 75 minutes of radar, which is about all the history ussat keeps, so clouds move for the whole loop.
       "radarFrameDelay": 150,
       "chartDevicePixelRatio": 1
+    },
+
+    "radar": { // the wasm radar engine (see /radar). frame counts and speed are under "performance".
+      "backend": "auto", // "auto" prefers WebGPU and falls back to WebGL2, "webgpu" or "webgl" force one. ?radarBackend=webgl overrides this for one page load.
+      "fps": 60, // draw rate cap. motion is computed per drawn frame, so this can be set to anything.
+      "interpolation": "flow", // "flow" moves echoes between frames, "crossfade" dissolves, "none" is hard cuts.
+      "flowResolution": 192, // longest side of the grid motion is estimated on. higher is finer but slower to load.
+      "concurrency": 4, // frames downloaded at once.
+      "refreshSeconds": 120, // how often to look for new frames.
+      // what each on-screen radar draws, bottom layer first. layers line up by timestamp, so products can update at different rates.
+      // products: a TWC product name ("twcRadarMosaic"), an Environment Canada mosaic ("eccc:RADAR_1KM_RRAI" rain, "eccc:RADAR_1KM_RSNO" snow),
+      // an NWS mosaic ("nws:conus_bref_qcd", "nws:alaska_bref_qcd", "nws:hawaii_bref_qcd"), or one NEXRAD station ("nws:KDTX").
+      // the top layer sets the loop's pace and length; a faster layer below it (NWS lands every ~2 min) is thinned to match.
+      // Environment Canada's composite covers Canada and the US, updates every 6 min and keeps 3 hours.
+      "layers": {
+        "main": [
+          { "product": "eccc:RADAR_1KM_RRAI", "opacity": 0.75 }
+        ],
+        "sidebar": [ // also the LDL brand rail's radar. sat updates every 15 min, ussat is sharper but only keeps about an hour of history.
+          { "product": "sat", "opacity": 0.8 },
+          { "product": "eccc:RADAR_1KM_RRAI", "opacity": 0.8 }
+        ],
+        "national": [
+          { "product": "ussat", "opacity": 0.8 },
+          { "product": "eccc:RADAR_1KM_RRAI", "opacity": 0.8 }
+        ]
+      },
+      "products": { // clean-up per product. "default" covers anything not listed.
+        // median: radius in source pixels, 0 (off), 1 or 2. gaussian: sigma in source pixels, 0 is off. sharpen: unsharp mask after the blur, 0 is off.
+        // edge: [low, high] alpha range remapped to a clean contour, which reads like vector art at any zoom. a narrower range is crisper, but makes uneven echo edges pop as they move. null keeps soft alpha.
+        // temporal: how gradually frames hand over, 0 (dissolve between two) to 1 (smooth blend across four, which stops uneven edges popping).
+        // shadow: [offset in px, opacity] for a hard shadow under the layer, or null.
+        "default": { "median": 1, "gaussian": 0.5, "sharpen": 0.4, "edge": [0.15, 0.85], "temporal": 1, "shadow": [2, 0.3] },
+        // translucent products: an edge remap would flatten them, and they aren't radar imagery to shadow.
+        "satrad": { "median": 0, "gaussian": 0.35, "sharpen": 0.4, "edge": null, "temporal": 1, "shadow": null },
+        "sat": { "median": 0, "gaussian": 0.8, "sharpen": 0.15, "edge": null, "temporal": 1, "shadow": null }, // native z5, drawn about 4x bigger, so it needs more blur to hide its pixels.
+        "ussat": { "median": 1, "gaussian": 0.35, "sharpen": 0.3, "edge": null, "temporal": 1, "shadow": null }
+      }
     },
 
     "music": {

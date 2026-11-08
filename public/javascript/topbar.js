@@ -28,7 +28,8 @@ function start() {
     const displayName = String(primaryGroup.locations[0].displayName ?? primaryLocation).replace(/,\s*[A-Z]{2}(?=\s*$|,)/, "");
 
     const radar = new RadarMap("ldl-rail-radar-map", {
-        totalFrames: Number(perf.sidebarRadarFrames ?? 24),
+        layers: config.radar.layers.sidebar,
+        totalFrames: Number(perf.sidebarRadarFrames ?? 36),
         frameDelay: Number(perf.radarFrameDelay ?? 150),
         loopGap: 2000,
         maxLoops: Number(perf.sidebarRadarLoops ?? Infinity),
@@ -44,7 +45,7 @@ function start() {
             status.setConditions(displayName, weatherIconUrl(iconDir, iconFile), current.temperature, current.wxPhraseLong);
         }
         const { lat, lon } = wx?.metadata?.localeData ?? {};
-        if (lat && lon) await radar.init(lat, lon, 6, "satrad");
+        if (lat && lon) await radar.init(lat, lon, 6);
     };
 
     requestAnimationFrame(() => requestAnimationFrame(refresh));

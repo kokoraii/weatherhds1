@@ -1,0 +1,12 @@
+Sources for borders.pmtiles, built by scripts/build-borders.sh.
+
+Canada: census subdivisions, 2021 cartographic boundary file.
+  Contains information licensed under the Open Government Licence - Canada (Statistics Canada).
+  https://www.statcan.gc.ca/en/reference/licence
+
+United States: counties, Cartographic Boundary Files 2023, 1:5,000,000.
+  U.S. Census Bureau. Public domain.
+
+Rest of the world: geoBoundaries Comprehensive Global Administrative Zones (CGAZ), ADM2.
+  Runfola et al. (2020), geoBoundaries: A global database of political administrative boundaries. PLoS ONE.
+  https://www.geoboundaries.org/ Licensed CC BY 4.0.

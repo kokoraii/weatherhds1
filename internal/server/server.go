@@ -390,7 +390,11 @@ func extractJSInt(source string, key string) int {
 func staticCacheHeaders(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		path := c.Request().URL.Path
-		if isCacheableStaticPath(path) {
+		if strings.HasPrefix(path, "/wasm/") || path == "/" || strings.HasSuffix(path, ".html") {
+			// The wasm glue script and binary must match, or the radar engine fails to load. The page must
+			// match its scripts too; without a header, browsers guess a lifetime and keep a stale copy.
+			c.Response().Header().Set("Cache-Control", "no-cache")
+		} else if isCacheableStaticPath(path) {
 			c.Response().Header().Set("Cache-Control", "public, max-age=3600")
 		}
 		return next(c)

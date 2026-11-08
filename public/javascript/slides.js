@@ -601,7 +601,7 @@ const bumperDefs = {
 };
 
 function resolveRegion(regionId) {
-    const ca = locationConfig.regionalLocations?.regions?.[regionId];
+    const ca = locationConfig.nationalLocations?.regions?.[regionId];
     if (ca) return { name: regionId, ...ca, country: "Canada" };
     const us = locationConfig.usaLocations?.regions?.[regionId];
     if (us) return { name: regionId, ...us, country: "USA" };

@@ -1,0 +1,45 @@
+[package]
+name = "weatherhds-radar"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Radar engine for WeatherHDS: interest lists, frame inventory, smoothing and motion interpolation."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+# The browser-facing half only builds for wasm, so `cargo test` runs the pure logic natively.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+bytemuck = { version = "1", features = ["derive"] }
+console_error_panic_hook = "0.1"
+futures = { version = "0.3", default-features = false, features = ["alloc"] }
+half = "2"
+js-sys = "0.3"
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "=0.2.130"
+wasm-bindgen-futures = "0.4"
+wgpu = { version = "30", default-features = false, features = ["webgpu", "webgl", "wgsl"] }
+web-sys = { version = "0.3", features = [
+    "Blob",
+    "CanvasRenderingContext2d",
+    "Document",
+    "HtmlCanvasElement",
+    "ImageBitmap",
+    "ImageData",
+    "OffscreenCanvas",
+    "OffscreenCanvasRenderingContext2d",
+    "Request",
+    "RequestInit",
+    "Response",
+    "Window",
+    "console",
+] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

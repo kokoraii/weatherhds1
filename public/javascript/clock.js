@@ -1,5 +1,6 @@
 import { config, clock as clockConfig } from "../config.js";
 import { topbarContent } from "./layout.js";
+import { setSteadyText } from "./steady-digits.js";
 
 const ldlDateEl = document.getElementById("ldl-date");
 const ldlTimeEl = document.getElementById("ldl-time");
@@ -87,7 +88,7 @@ if (ldlDateEl && ldlTimeEl && !topbarContent) {
 		const activeZone = zones[zoneIndex] || systemZone;
 
 		ldlDateEl.textContent = formatDate(now, activeZone);
-		ldlTimeEl.textContent = formatTime(now, activeZone);
+		setSteadyText(ldlTimeEl, formatTime(now, activeZone));
 	};
 
 	render();

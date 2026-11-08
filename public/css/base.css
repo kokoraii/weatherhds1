@@ -83,6 +83,13 @@
   box-sizing: border-box;
 }
 
+/* One digit of a ticking time (steady-digits.js). As wide as Poppins' widest digit, so times keep one width. */
+.digit {
+  display: inline-block;
+  width: 0.64em;
+  text-align: center;
+}
+
 .main-slide,
 .bumper-slide,
 .ldl-presentation-slide,

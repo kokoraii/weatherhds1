@@ -16,3 +16,6 @@ weatherhds.exe
 /public/audio/vocallocal/*
 !/public/audio/vocallocal/Allen
 dist/
+# Radar engine build output
+/radar/target/
+/scripts/borders/target/

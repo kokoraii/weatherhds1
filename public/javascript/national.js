@@ -33,7 +33,7 @@ function iconPath(iconCode, dayOrNight) {
 
 function getAllRegions() {
     const out = [];
-    for (const [name, data] of Object.entries(locationConfig.regionalLocations?.regions || {})) {
+    for (const [name, data] of Object.entries(locationConfig.nationalLocations?.regions || {})) {
         out.push({ name, ...data, country: "Canada" });
     }
     for (const [name, data] of Object.entries(locationConfig.usaLocations?.regions || {})) {
@@ -164,9 +164,22 @@ function populateSlide(slideEl, regionName, label, locationData, buildCardFn) {
 
 const regionalRadar = new RadarMap("national-radar-map", {
     timeElement: document.querySelector(".left-container-radar .national-current-labels .national-current-label:last-child"),
-    product: "satrad",
+    layers: config.radar.layers.national,
+    totalFrames: Number(config.performance?.nationalRadarFrames ?? 16),
     maxLoops: Infinity,
+    sizeHint: [0.5, 1],
+    tileDetail: 0, // every region stays in memory, so these trade some sharpness for a quarter of the size
 });
+
+// Fetches every region the playlist visits at startup, so each loop is ready before its region airs.
+const playlistRegionIds = new Set(
+    locationConfig.mainBlockPlaylist.filter(item => item.playlist === "national").map(item => item.regionId)
+);
+for (const region of getAllRegions()) {
+    if (playlistRegionIds.has(region.name)) {
+        regionalRadar.prefetch(region.mapCenter[0], region.mapCenter[1], region.zoomLevel);
+    }
+}
 
 async function initRegionalRadar(center, zoom) {
     if (!regionalRadar.isActive) {

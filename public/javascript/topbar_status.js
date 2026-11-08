@@ -1,4 +1,5 @@
 import { config, clock as clockConfig } from "../config.js";
+import { steadyDigits } from "./steady-digits.js";
 
 // Clock and status line for the filled top bar (topbar.js starts both). The radar notch clock shows
 // "11:39:52a CST"; the status line in the top bar cycles the date, the song playing and current conditions.
@@ -22,20 +23,24 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short"
 const monthFormat = new Intl.DateTimeFormat("en-US", { timeZone, month: "long" });
 
 // A status line is a list of parts: plain text, { light } for light-weight text, { icon } for an image.
-function render(el, parts) {
-    el.replaceChildren(...parts.map(part => {
-        if (typeof part === "string") return part;
-        if (part.icon) return Object.assign(document.createElement("img"), { className: "topbar-status-icon", src: part.icon, alt: "" });
-        return Object.assign(document.createElement("span"), { className: "light", textContent: part.light });
+// Light text (seconds, song time) always has steady digits so ticking doesn't shift the line; plain text
+// only when `steady`, since the date and temperature don't tick and look gappy with fixed-width digits.
+function render(el, parts, steady) {
+    el.replaceChildren(...parts.flatMap(part => {
+        if (typeof part === "string") return steady ? steadyDigits(part) : [part];
+        if (part.icon) return [Object.assign(document.createElement("img"), { className: "topbar-status-icon", src: part.icon, alt: "" })];
+        const light = Object.assign(document.createElement("span"), { className: "light" });
+        light.append(...steadyDigits(part.light));
+        return [light];
     }));
 }
 
 // Renders into el only when the parts changed, so the once-a-second tick doesn't rebuild an unchanged line.
-function renderIfChanged(el, parts) {
+function renderIfChanged(el, parts, steady = false) {
     const signature = JSON.stringify(parts);
     if (el.dataset.signature === signature) return;
     el.dataset.signature = signature;
-    render(el, parts);
+    render(el, parts, steady);
 }
 
 // "11:39:52a CST": the last colon and seconds and the zone in light weight.
@@ -48,7 +53,7 @@ export function startNotchClock(el) {
             ...(showSeconds ? [{ light: `:${p.second}` }] : []),
             use24Hour ? "" : p.dayPeriod[0].toLowerCase(),
             { light: ` ${p.timeZoneName}` },
-        ]);
+        ], true);
     };
     tick();
     setInterval(tick, 1000);

@@ -70,6 +70,14 @@
       }
     },
     {
+      "id": "admin-2-boundary", "type": "line", "source": "borders", "source-layer": "borders",
+      "paint": {
+        "line-color": "#ffffff",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.3, 7, 0.7, 10, 1],
+        "line-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0.14, 6, 0.26, 8, 0.4]
+      }
+    },
+    {
       "id": "admin-1-boundary-bg", "type": "line", "source": "openmaptiles", "source-layer": "boundary", "minzoom": 7,
       "filter": ["all", ["==", ["get", "admin_level"], 4], ["!=", ["get", "maritime"], 1]],
       "paint": {

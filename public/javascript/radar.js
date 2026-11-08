@@ -1,28 +1,28 @@
 import { config } from "../config.js";
+import { renderRadarLegend } from "./radar-legends.js";
+import { setSteadyText } from "./steady-digits.js";
+
+// On-screen radars. The picture is three stacked layers inside each container:
+//   base map (land, water, roads) < radar canvas (the Rust engine in /radar) < label map (borders, place names)
+// Both maps stay idle unless the camera moves, so a 60 fps radar doesn't redraw the map, and the browser
+// composites the layers. This file only glues the engine to MapLibre and the DOM. Frames, smoothing and
+// interpolation all live in the engine.
 
 const perf = config.performance ?? {};
 
 const DEFAULTS = {
     mapStyle: "/maps/radar-dark.json", // MapLibre style on OpenFreeMap tiles
-    product: "twcRadarHcMosaic",
-    totalFrames: Number(perf.mainRadarFrames ?? 48),
+    layers: config.radar.layers.main, // bottom first
+    totalFrames: Number(perf.mainRadarFrames ?? 48), // of the top layer; the others cover the same time
     frameDelay: Number(perf.radarFrameDelay ?? 150),
     loopGap: 1000,
     maxLoops: Number(perf.mainRadarLoops ?? 12),
     maxTTL: 6,
     flyDuration: 2500,
     labelTextSize: 40,
-    radarOpacity: 0.75,
+    sizeHint: [1, 1], // expected share of the window, used to plan tiles while the container is hidden
+    tileDetail: 1, // zoom levels above the map's to fetch: 1 draws tiles 1:1, 0 at 2x for a quarter of the memory
 };
-
-let _keys = null;
-async function getKeys() {
-    if (_keys) return _keys;
-    const res = await fetch('/config/keys');
-    if (!res.ok) throw new Error(`Failed to fetch radar keys: ${res.status}`);
-    _keys = await res.json();
-    return _keys;
-}
 
 const log = () => `[radar.js] | ${new Date().toLocaleString()} |`;
 
@@ -35,391 +35,296 @@ const formatTime = (ts) => {
     return `${h}:${m < 10 ? "0" + m : m} ${ampm}`;
 };
 
-async function fetchTimeslices(apiKey, totalFrames, product = "twcRadarHcMosaic") {
-    const res = await fetch(
-        `https://api.weather.com/v3/TileServer/series/productSet/PPAcore?apiKey=${apiKey}`
-    );
-    if (!res.ok) throw new Error(`Timeslice fetch failed: ${res.status}`);
-    const data = await res.json();
+// Radars with maps on the page, drawn from the one animation loop.
+const activeRadars = new Set();
 
-    // Each product publishes its own series. Use the tile product's, not "radar": the mosaics lag it
-    // by a few minutes, so its newest timestamps would be "Future tile" (HTTP 400) for them.
-    const series = data.seriesInfo[product]?.series;
-    if (!series) throw new Error(`No timeslice series for product ${product}`);
-    return series.slice(0, totalFrames).reverse();
+let enginePromise = null;
+
+// Loads the wasm engine once. Imported dynamically so a missing or broken build costs the radar overlay,
+// not every module that imports this file.
+function getEngine() {
+    enginePromise ??= (async () => {
+        const [{ default: init, RadarEngine }, keys] = await Promise.all([
+            import("/wasm/weatherhds_radar.js"),
+            fetch("/config/keys").then((res) => {
+                if (!res.ok) throw new Error(`Failed to fetch radar keys: ${res.status}`);
+                return res.json();
+            }),
+        ]);
+        await init();
+        const backend = new URLSearchParams(window.location.search).get("radarBackend");
+        const engine = await RadarEngine.create(
+            { ...config.radar, ...(backend ? { backend } : {}) },
+            keys.twcApiKey,
+        );
+        window.radarInventory = () => engine.inventory(); // for checking on loading from the console
+
+        const loop = (now) => {
+            engine.pump(now);
+            for (const radar of activeRadars) radar.drawFrame(now);
+            requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+        return engine;
+    })().catch((err) => {
+        enginePromise = null;
+        throw err;
+    });
+    return enginePromise;
+}
+
+// County-level borders, from our own tile archive (scripts/build-borders.sh): the map's tiles only carry
+// them when zoomed in much further than the radars go.
+const BORDERS_SOURCE = { type: "vector", url: `pmtiles://${window.location.origin}/maps/borders.pmtiles` };
+const PMTILES_READER = "https://unpkg.com/pmtiles@4.5.0/dist/pmtiles.js";
+
+let bordersPromise = null;
+
+// Loads the archive reader once. Resolves to whether it worked: if it can't load, the maps go without
+// county borders rather than taking down everything that imports this file.
+function loadBordersReader() {
+    bordersPromise ??= new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = PMTILES_READER;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`could not load ${PMTILES_READER}`));
+        document.head.append(script);
+    }).then(() => {
+        maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile);
+        return true;
+    }).catch((err) => {
+        console.warn(log(), "County borders unavailable:", err.message);
+        return false;
+    });
+    return bordersPromise;
+}
+
+let stylePromise = null;
+const loadStyle = (url) => (stylePromise ??= fetch(url).then((res) => res.json()));
+
+// Cuts the map style where the old radar layers used to be inserted: borders and labels go above the radar.
+function splitStyle(style, labelTextSize, hasBorders) {
+    const split = style.layers.findIndex(
+        (l) => l.type === "symbol" || l.id.includes("boundary") || l.id.includes("border"),
+    );
+    const labels = structuredClone(style.layers.slice(split)).filter((layer) => hasBorders || layer.source !== "borders");
+    for (const layer of labels) {
+        if (layer.type === "symbol" && layer.layout?.["text-size"]) {
+            layer.layout["text-size"] = layer.id === "road-shield" ? 18 : labelTextSize;
+        }
+    }
+    return {
+        base: { ...style, layers: style.layers.slice(0, split) },
+        labels: { ...style, sources: { ...style.sources, ...(hasBorders && { borders: BORDERS_SOURCE }) }, layers: labels },
+    };
+}
+
+function coverElement(el, zIndex) {
+    el.style.cssText = `position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:${zIndex}`;
+    return el;
 }
 
 export class RadarMap {
-    #map = null;
-    #slices = [];
-    #frame = 0;
-    #loops = 0;
+    #baseMap = null;
+    #labelMap = null;
+    #labelsEl = null;
+    #canvas = coverElement(document.createElement("canvas"), 1); // outlives destroy(), and its GPU context with it
+    #surfacePromise = null;
+    #surface = null;
+    #size = { width: 0, height: 0 };
     #ttl = 0;
-    #animTimer = null;
-    #loopTimer = null;
-    #preloaded = false;
-    #preloadPromise = null;
     #pendingInit = null;
     #resizeObserver = null;
+    #frameTs = null;
     #containerId;
     #timeEl;
-    #onFrame;
     #opts;
 
     constructor(containerId, options = {}) {
         this.#containerId = containerId;
         this.#opts = { ...DEFAULTS, ...options };
         this.#timeEl = options.timeElement ?? null;
-        this.#onFrame = options.onFrame ?? null;
     }
 
-    get map() { return this.#map; }
-    get isActive() { return this.#map !== null; }
+    get isActive() { return this.#baseMap !== null; }
     get ttl() { return this.#ttl; }
 
     #getContainer() {
         return document.getElementById(this.#containerId);
     }
 
-    #isVisible() {
+    #measure() {
         const el = this.#getContainer();
-        return Boolean(el && el.offsetWidth > 0 && el.offsetHeight > 0);
+        this.#size = { width: el.clientWidth, height: el.clientHeight };
     }
 
-    #setupResizeObserver() {
-        if (this.#resizeObserver) return;
-        const container = this.#getContainer();
-        if (!container) return;
+    #isVisible() {
+        return this.#size.width > 0 && this.#size.height > 0;
+    }
 
+    #getSurface() {
+        this.#surfacePromise ??= (async () => {
+            const engine = await getEngine();
+            const { frameDelay, loopGap, maxLoops } = this.#opts;
+            this.#surface = await engine.createSurface(this.#containerId, this.#canvas, {
+                frameDelay,
+                loopGap,
+                maxLoops: Number.isFinite(maxLoops) ? maxLoops : undefined,
+            });
+            console.log(log(), `Radar engine on ${this.#surface.backend} for [${this.#containerId}]`);
+            return this.#surface;
+        })().catch((err) => {
+            // The map can still run without its radar; the next init tries again.
+            console.error(log(), "Radar engine unavailable:", err);
+            this.#surfacePromise = null;
+            return null;
+        });
+        return this.#surfacePromise;
+    }
+
+    // The request the engine turns into an interest list per layer.
+    #view(lat, lon, zoom) {
+        const { layers, sizeHint, tileDetail, totalFrames } = this.#opts;
+        const width = this.#size.width || window.innerWidth * sizeHint[0];
+        const height = this.#size.height || window.innerHeight * sizeHint[1];
+        return { layers, frames: totalFrames, detail: tileDetail, lat, lon, zoom, width, height };
+    }
+
+    #observeSize() {
+        if (this.#resizeObserver) return;
         // Acts on the next frame: creating or resizing the map inside the callback changes the observed
         // layout again and raises "ResizeObserver loop completed with undelivered notifications".
-        this.#resizeObserver = new ResizeObserver((entries) => requestAnimationFrame(() => {
-            for (const entry of entries) {
-                const { width, height } = entry.contentRect;
-                if (width === 0 || height === 0) continue;
+        this.#resizeObserver = new ResizeObserver(() => requestAnimationFrame(() => {
+            this.#measure();
+            if (!this.#isVisible()) return;
 
-                if (this.#pendingInit) {
-                    const pending = this.#pendingInit;
-                    this.#pendingInit = null;
-                    this.#teardownResizeObserver();
-                    this.init(pending.lat, pending.lon, pending.zoom, pending.product);
-                    return;
-                }
-
-                if (this.#map) {
-                    this.#map.resize();
-                }
+            if (this.#pendingInit) {
+                const { lat, lon, zoom } = this.#pendingInit;
+                this.init(lat, lon, zoom);
+                return;
             }
+            this.resize();
         }));
-
-        this.#resizeObserver.observe(container);
+        this.#resizeObserver.observe(this.#getContainer());
     }
 
-    #teardownResizeObserver() {
-        this.#resizeObserver?.disconnect();
-        this.#resizeObserver = null;
+    async #createMaps(center, zoom) {
+        const container = this.#getContainer();
+        const [style, hasBorders] = await Promise.all([loadStyle(this.#opts.mapStyle), loadBordersReader()]);
+        const { base, labels } = splitStyle(style, this.#opts.labelTextSize, hasBorders);
+        const mapOptions = {
+            center,
+            zoom,
+            interactive: false,
+            attributionControl: false,
+            fadeDuration: 0,
+            renderWorldCopies: false,
+        };
+
+        this.#baseMap = new maplibregl.Map({ ...mapOptions, container, style: base });
+        container.append(this.#canvas);
+        this.#labelsEl = coverElement(document.createElement("div"), 2);
+        container.append(this.#labelsEl);
+        this.#labelMap = new maplibregl.Map({ ...mapOptions, container: this.#labelsEl, style: labels });
+
+        this.#baseMap.on("move", () => {
+            this.#labelMap.jumpTo({ center: this.#baseMap.getCenter(), zoom: this.#baseMap.getZoom() });
+        });
+        activeRadars.add(this);
     }
 
-    async init(lat, lon, zoom, product) {
-        product = product ?? this.#opts.product;
-
+    async init(lat, lon, zoom) {
         if (!lat || !lon) {
             console.warn(log(), "Invalid coordinates");
             return;
         }
 
+        this.#observeSize();
+        this.#measure();
+        const surface = await this.#getSurface();
+
         if (!this.#isVisible()) {
-            this.#pendingInit = { lat, lon, zoom, product };
-            this.#setupResizeObserver();
-            this.#stopAnimation();
+            // Off screen for now: fetching starts anyway, so the loop is ready when it airs.
+            surface?.want(this.#view(lat, lon, zoom), true);
+            this.#pendingInit = { lat, lon, zoom };
             return;
         }
-
         this.#pendingInit = null;
-        const { twcApiKey } = await getKeys();
-        const center = [lon, lat];
 
-        if (this.#map) {
-            if (this.#ttl >= this.#opts.maxTTL) {
-                this.destroy();
-                return this.init(lat, lon, zoom, product);
-            }
-            this.#map.resize();
-            this.#map.jumpTo({ center, zoom });
+        if (this.#baseMap && this.#ttl >= this.#opts.maxTTL) this.destroy();
+
+        if (this.#baseMap) {
+            this.resize();
+            this.#baseMap.jumpTo({ center: [lon, lat], zoom });
             this.#ttl++;
-            return this.#loadAndAnimate(product, twcApiKey);
+        } else {
+            await this.#createMaps([lon, lat], zoom);
         }
-
-        this.#map = new maplibregl.Map({
-            container: this.#containerId,
-            style: this.#opts.mapStyle,
-            center,
-            interactive: false,
-            zoom,
-            attributionControl: false,
-            preserveDrawingBuffer: false,
-            trackResize: true,
-            // Every radar frame change redraws the whole map; keep each redraw as cheap as possible.
-            fadeDuration: 0,                    // no label fade, which keeps rendering for 300 ms after each redraw
-            renderWorldCopies: false,
-        });
-
-        await new Promise((resolve) => {
-            this.#map.once("load", () => {
-                this.#map.getStyle().layers.forEach((layer) => {
-                    if (layer.type === "symbol" && layer.layout?.["text-size"]) {
-                        this.#map.setLayoutProperty(layer.id, "text-size", this.#opts.labelTextSize);
-                    }
-                });
-                this.#map.setLayoutProperty("road-shield", "text-size", 18);
-                resolve();
-            });
-        });
-
-        await this.#loadAndAnimate(product, twcApiKey);
+        surface?.show(this.#view(lat, lon, zoom));
     }
 
-    async flyTo(lat, lon, zoom, product) {
-        if (!this.#map) return;
+    // Starts fetching a view this radar will show later, behind anything on screen sooner.
+    async prefetch(lat, lon, zoom) {
+        const surface = await this.#getSurface();
+        surface?.want(this.#view(lat, lon, zoom), false);
+    }
 
-        this.#loops = 0;
+    async flyTo(lat, lon, zoom) {
+        if (!this.#baseMap) return;
 
-        this.#map.flyTo({
+        const surface = await this.#getSurface();
+        surface?.show(this.#view(lat, lon, zoom));
+
+        this.#baseMap.flyTo({
             center: [lon, lat],
             zoom,
             duration: this.#opts.flyDuration,
             essential: true,
         });
 
-        await new Promise((resolve) => this.#map.once("moveend", resolve));
+        await new Promise((resolve) => this.#baseMap.once("moveend", resolve));
         this.#ttl++;
     }
 
-    async preload(product) {
-        const { twcApiKey } = await getKeys();
-        product = product ?? this.#opts.product;
-        if (this.#preloaded) return;
-        try {
-            await this.#fetchSlices(product, twcApiKey);
-            console.log(log(), `Radar preloaded for [${this.#containerId}]`);
-        } catch (err) {
-            console.error(log(), "Preload failed:", err.message);
-        }
-    }
-
     resize() {
-        if (this.#pendingInit) return;
-        if (!this.#map) return;
-        this.#map.resize();
-    }
-
-    pause() {
-        this.#stopAnimation();
-    }
-
-    resume() {
-        if (this.#map && this.#slices.length) {
-            this.#animate();
-        }
+        this.#baseMap?.resize();
+        this.#labelMap?.resize();
     }
 
     destroy() {
-        if (!this.#map) return;
-        this.#teardownResizeObserver();
-        this.#stopAnimation();
-        this.#map.remove();
-        this.#map = null;
+        if (!this.#baseMap) return;
+        activeRadars.delete(this);
+        this.#labelMap.remove();
+        this.#labelsEl.remove();
+        this.#canvas.remove();
+        this.#baseMap.remove();
+        this.#baseMap = null;
+        this.#labelMap = null;
+        this.#labelsEl = null;
         this.#ttl = 0;
-        this.#slices = [];
-        this.#preloaded = false;
-        this.#preloadPromise = null;
         this.#pendingInit = null;
     }
 
-    #stopAnimation() {
-        if (this.#animTimer) { clearInterval(this.#animTimer); this.#animTimer = null; }
-        if (this.#loopTimer) { clearTimeout(this.#loopTimer); this.#loopTimer = null; }
-    }
-
-    async #fetchSlices(product, twcApiKey) {
-        if (this.#preloadPromise) return this.#preloadPromise;
-
-        this.#preloadPromise = (async () => {
-            try {
-                this.#slices = await fetchTimeslices(twcApiKey, this.#opts.totalFrames, product);
-                this.#preloaded = true;
-                return this.#slices;
-            } catch (err) {
-                console.error(log(), "Slice fetch error:", err.message);
-                this.#preloadPromise = null;
-                throw err;
-            }
-        })();
-
-        return this.#preloadPromise;
-    }
-
-    #waitForIdle(timeout = 20000) {
-        return new Promise((resolve) => {
-            if (this.#map.isStyleLoaded() && this.#map.areTilesLoaded()) {
-                resolve();
-                return;
-            }
-            const timer = setTimeout(() => {
-                this.#map.off("idle", onIdle);
-                resolve();
-            }, timeout);
-            const onIdle = () => {
-                clearTimeout(timer);
-                resolve();
-            };
-            this.#map.once("idle", onIdle);
-        });
-    }
-
-    async #loadAndAnimate(product, twcApiKey) {
-        try {
-            if (!this.#isVisible()) {
-                this.#stopAnimation();
-                const center = this.#map?.getCenter();
-                this.#pendingInit = { lat: center?.lat, lon: center?.lng, zoom: this.#map?.getZoom(), product };
-                this.#setupResizeObserver();
-                return;
-            }
-
-            this.#stopAnimation();
-            this.#map.resize();
-            this.#frame = 0;
-            this.#loops = 0;
-
-            if (!this.#preloaded) {
-                await this.#fetchSlices(product, twcApiKey);
-            }
-
-            const style = this.#map.getStyle();
-            if (style?.layers) {
-                for (const layer of style.layers) {
-                    if (layer.id.startsWith("radarlayer_")) {
-                        this.#map.removeLayer(layer.id);
-                        this.#map.removeSource(layer.id);
-                    }
-                }
-            }
-
-            await this.#waitForIdle();
-
-            const firstLabelLayer = this.#map.getStyle().layers.find(
-                l => l.type === "symbol" || l.id.includes("boundary") || l.id.includes("border")
-            )?.id;
-
-            const failedSources = new Set();
-            const onError = (e) => {
-                if (e.sourceId?.startsWith("radarlayer_")) failedSources.add(e.sourceId);
-            };
-            this.#map.on("error", onError);
-
-            for (let i = 0; i < this.#slices.length; i++) {
-                const ts = this.#slices[i];
-                this.#map.addLayer({
-                    id: `radarlayer_${ts.ts}`,
-                    type: "raster",
-                    source: {
-                        type: "raster",
-                        tiles: [
-                            `https://api.weather.com/v3/TileServer/tile/${product}?ts=${ts.ts}&xyz={x}:{y}:{z}&apiKey=${twcApiKey}`,
-                        ],
-                        tileSize: 512,
-                    },
-                    layout: { visibility: "visible" },
-                    paint: {
-                        "raster-opacity": 0,
-                        "raster-opacity-transition": { duration: 0, delay: 0 },
-                        "raster-fade-duration": 0,
-                    },
-                }, firstLabelLayer);
-            }
-
-            await this.#waitForIdle();
-            this.#map.off("error", onError);
-
-            if (failedSources.size) {
-                for (const id of failedSources) {
-                    try { this.#map.removeLayer(id); this.#map.removeSource(id); } catch (_) {}
-                }
-                this.#slices = this.#slices.filter(ts => !failedSources.has(`radarlayer_${ts.ts}`));
-                console.warn(log(), `Dropped ${failedSources.size} failed radar frames`);
-            }
-
-            this.#animate();
-        } catch (err) {
-            console.error(log(), "Radar error:", err.message);
+    // Called from the animation loop.
+    drawFrame(now) {
+        if (!this.#surface || !this.#isVisible()) return;
+        const { lat, lng } = this.#baseMap.getCenter();
+        const { width, height } = this.#size;
+        const ts = this.#surface.render(now, lat, lng, this.#baseMap.getZoom(), width, height, window.devicePixelRatio);
+        if (ts !== undefined && ts !== this.#frameTs) {
+            this.#frameTs = ts;
+            if (this.#timeEl) setSteadyText(this.#timeEl, formatTime(ts));
         }
-    }
-
-    #animate() {
-        if (!this.#slices.length || this.#loops >= this.#opts.maxLoops) return;
-
-        this.#animTimer = setInterval(() => {
-            if (!this.#isVisible()) {
-                this.#stopAnimation();
-                return;
-            }
-
-            if (this.#frame >= this.#slices.length) {
-                clearInterval(this.#animTimer);
-                this.#animTimer = null;
-                this.#loopTimer = setTimeout(() => {
-                    this.#frame = 0;
-                    this.#loops++;
-                    this.#animate();
-                }, this.#opts.loopGap);
-                return;
-            }
-
-            const ts = this.#slices[this.#frame];
-            const previousFrame = this.#frame === 0 ? this.#slices.length - 1 : this.#frame - 1;
-            const previousTs = this.#slices[previousFrame];
-
-            if (this.#timeEl) {
-                this.#timeEl.textContent = formatTime(ts.ts);
-            }
-
-            if (typeof this.#onFrame === "function") {
-                this.#onFrame(this.#frame, this.#slices.length, ts);
-            }
-
-            if (previousTs && previousTs.ts !== ts.ts) {
-                this.#map.setPaintProperty(`radarlayer_${previousTs.ts}`, "raster-opacity", 0);
-            }
-            this.#map.setPaintProperty(`radarlayer_${ts.ts}`, "raster-opacity", this.#opts.radarOpacity);
-
-            this.#frame++;
-        }, this.#opts.frameDelay);
-
     }
 }
 
 const mainRadar = new RadarMap("radar-map", {
     timeElement: document.getElementById("main-radar-time"),
 });
+renderRadarLegend(document.getElementById("main-radar-legend"), DEFAULTS.layers);
 
-export function clearMap() { mainRadar.destroy(); }
 export function resizeRadar() { mainRadar.resize(); }
-export let mapTTL = 0;
 
-export async function preloadRadar(lat, lon, product) {
-    await mainRadar.preload(product);
-}
-
-export async function drawMap(lat, lon, product, zoom, htmlID) {
-    if (htmlID !== "radar-div-so-that-mapbox-will-be-happy") {
-        console.warn(log(), `drawMap called with non-main container "${htmlID}" — use RadarMap class directly`);
-    }
-    await mainRadar.init(lat, lon, zoom, product);
-    mapTTL = mainRadar.ttl;
-}
-
-export async function easeMapTo(lat, lon, product, zoom) {
-    await mainRadar.flyTo(lat, lon, zoom, product);
-    mapTTL = mainRadar.ttl;
+export async function drawMap(lat, lon, zoom) {
+    await mainRadar.init(lat, lon, zoom);
 }
