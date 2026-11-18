@@ -1,6 +1,7 @@
 import { config, locationConfig, displayUnits, serverConfig, weatherIcons } from "../config.js";
 import { requestWxData } from "./data.js";
 import { RadarMap } from "./radar.js";
+import { presentations } from "./presentation.js";
 import { weatherIconUrl } from "./icons.js";
 
 const log = () => `[national.js] | ${new Date().toLocaleString()} |`;
@@ -163,6 +164,7 @@ function populateSlide(slideEl, regionName, label, locationData, buildCardFn) {
 }
 
 const regionalRadar = new RadarMap("national-radar-map", {
+    presentation: presentations.main,
     timeElement: document.querySelector(".left-container-radar .national-current-labels .national-current-label:last-child"),
     layers: config.radar.layers.national,
     totalFrames: Number(config.performance?.nationalRadarFrames ?? 16),
@@ -197,7 +199,7 @@ function resetSlideState(slideEl) {
     slideEl.style.display = "none";
 }
 
-function showSlide(slideId) {
+function showSlide(slideId, ctl) {
     const slides = [dom.currentSlide, dom.forecast1Slide, dom.forecast2Slide];
     const el = document.getElementById(slideId);
 
@@ -214,7 +216,7 @@ function showSlide(slideId) {
         void el.offsetWidth;
         el.classList.add("is-active", "is-entering");
 
-        window.setTimeout(() => {
+        ctl.after(() => {
             if (el.classList.contains("is-active")) {
                 el.classList.remove("is-entering");
             }
@@ -222,19 +224,14 @@ function showSlide(slideId) {
     }
 }
 
-function hideSlide(slideId) {
+async function hideSlide(slideId, ctl) {
     const el = document.getElementById(slideId);
-    if (!el) return Promise.resolve();
+    if (!el) return;
 
     el.classList.remove("is-entering");
     el.classList.add("is-leaving");
-
-    return new Promise(resolve => {
-        window.setTimeout(() => {
-            resetSlideState(el);
-            resolve();
-        }, SLIDE_EXIT_DURATION);
-    });
+    await ctl.wait(SLIDE_EXIT_DURATION);
+    resetSlideState(el);
 }
 
 function updateSlideInfo(locationName, slideLabel, totalDuration) {
@@ -251,7 +248,8 @@ function updateSlideInfo(locationName, slideLabel, totalDuration) {
     }
 }
 
-export async function runRegionalPlayback(regions, callback) {
+// Plays the national segment as part of the main presentation, timed by its controller (ctl).
+export async function runRegionalPlayback(regions, callback, ctl) {
     if (!regions?.length) {
         regions = getAllRegions();
     }
@@ -270,7 +268,7 @@ export async function runRegionalPlayback(regions, callback) {
     for (const region of regions) {
         console.log(log(), `National playback: ${region.name} (${region.country})`);
 
-        const locationData = await fetchRegionData(region.locations);
+        const locationData = await ctl.guard(fetchRegionData(region.locations));
 
         const firstForecast = locationData.find(
             d => d.data?.weather?.["v3-wx-forecast-daily-3day"]
@@ -297,7 +295,7 @@ export async function runRegionalPlayback(regions, callback) {
             (loc, data) => buildForecastCard(loc, data, 1)
         );
 
-        await initRegionalRadar(region.mapCenter, region.zoomLevel);
+        await ctl.guard(initRegionalRadar(region.mapCenter, region.zoomLevel));
 
         const slides = [
             { id: "current-national", label: "Current Observations" },
@@ -307,13 +305,9 @@ export async function runRegionalPlayback(regions, callback) {
 
         for (const slide of slides) {
             updateSlideInfo(regionLabel, slide.label, SLIDE_DURATION);
-            showSlide(slide.id);
-
-            await new Promise(resolve => {
-                window.setTimeout(resolve, SLIDE_DURATION - SLIDE_EXIT_DURATION);
-            });
-
-            await hideSlide(slide.id);
+            showSlide(slide.id, ctl);
+            await ctl.wait(SLIDE_DURATION - SLIDE_EXIT_DURATION);
+            await hideSlide(slide.id, ctl);
         }
     }
 

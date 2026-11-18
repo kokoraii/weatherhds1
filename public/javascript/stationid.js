@@ -1,4 +1,8 @@
 import { brand, versionID, bumperBackgroundsRandom, stationIdBlurbs } from "../config.js";
+import { presentations } from "./presentation.js";
+
+// The station ID is a bumper of the main presentation; its timers and clip pause and stop with it.
+const ctl = presentations.main;
 
 // Station ID bumper. A random clip from bumperBackgroundsRandom.stationId plays full-bleed behind the UI,
 // cued through video.js (loaded globally from index.html). The clip stays hidden until it actually starts
@@ -52,7 +56,7 @@ function showProvider(index) {
 }
 
 function clearProviderTimers() {
-    providerTimers.forEach(clearTimeout);
+    providerTimers.forEach(timer => ctl.cancel(timer));
     providerTimers = [];
 }
 
@@ -63,14 +67,14 @@ function reveal() {
     clearProviderTimers();
     const sliceMs = (leavesAt - performance.now()) / providerLogoEls.length;
     for (let i = 1; i < providerLogoEls.length; i++) {
-        providerTimers.push(setTimeout(() => showProvider(i), sliceMs * i));
+        providerTimers.push(ctl.after(() => showProvider(i), sliceMs * i));
     }
 }
 
 // Fires once the clip has loaded enough to actually play, so a slow load never fades in a blank frame.
 function onClipPlaying() {
     player.addClass('is-playing');
-    revealTimer = setTimeout(reveal, VIDEO_LEAD_MS);
+    revealTimer = ctl.after(reveal, VIDEO_LEAD_MS);
 }
 
 // Called by runBumperSlide when the station ID comes on, with how long until it starts sliding out.
@@ -91,10 +95,20 @@ export function startStationId(onAirMs) {
 
 // Called by runBumperSlide as the station ID starts sliding out: fades the clip, then stops it once hidden.
 export function endStationId() {
-    clearTimeout(revealTimer);
+    ctl.cancel(revealTimer);
     clearProviderTimers();
     player.off('playing', onClipPlaying);
     player.off('error', reveal);
     player.removeClass('is-playing');
     setTimeout(() => player.pause(), VIDEO_FADE_MS);
 }
+
+let playingWhenPaused = false;
+ctl.onPause(() => {
+    playingWhenPaused = !player.paused();
+    if (playingWhenPaused) player.pause();
+});
+ctl.onResume(() => {
+    if (playingWhenPaused) player.play();
+});
+ctl.onStop(endStationId);

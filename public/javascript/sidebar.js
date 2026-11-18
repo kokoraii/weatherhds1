@@ -3,6 +3,11 @@ import { weatherIcons, locationConfig, serverConfig, displayUnits, config } from
 import { RadarMap } from './radar.js';
 import { weatherIconUrl } from './icons.js';
 import { sidebarEnabled } from './layout.js';
+import { presentations } from './presentation.js';
+
+// The sidebar presentation: current conditions, the cycling summary lines and the radar. Its timing runs
+// through its controller (presentation.js) so the server can pause, stop or rebuild it.
+const ctl = presentations.sidebar;
 
 const perf = config.performance ?? {};
 const iconDir = config.staticIcons ? "static" : "smil";
@@ -14,6 +19,7 @@ const radarInstance = new RadarMap('sidebar-radar-map', {
     loopGap:      2000,
     maxLoops:     Number(perf.sidebarRadarLoops ?? Infinity),
     labelTextSize: 22,
+    presentation: ctl,
 });
 
 const SUMMARY_HOLD_MS = 5000;
@@ -67,19 +73,19 @@ function setSlidingText(el, value) {
     }
 
     const oldTimer = slideTextTimers.get(el);
-    if (oldTimer) clearTimeout(oldTimer);
+    if (oldTimer) ctl.cancel(oldTimer);
 
     el.classList.remove('sidebar-slide-in');
     el.classList.add('sidebar-slide-out');
 
-    const timer = setTimeout(() => {
+    const timer = ctl.after(() => {
         el.innerHTML = next;
         el.classList.remove('sidebar-slide-out');
         el.classList.add('sidebar-slide-in');
         slideTextTimers.delete(el);
 
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
+        ctl.frame(() => {
+            ctl.frame(() => {
                 el.classList.remove('sidebar-slide-in');
             });
         });
@@ -94,8 +100,8 @@ function updateSidebarSummary(lines) {
     if (!summaryContainer || !lineEl) return;
 
     if (!latestLines.length) {
-        clearTimeout(summaryCycleTimer);
-        clearTimeout(summaryTransitionTimer);
+        ctl.cancel(summaryCycleTimer);
+        ctl.cancel(summaryTransitionTimer);
         summaryRunning = false;
         lineEl.textContent = '';
         return;
@@ -109,8 +115,8 @@ function updateSidebarSummary(lines) {
 }
 
 function scheduleNextSummaryLine() {
-    clearTimeout(summaryCycleTimer);
-    summaryCycleTimer = setTimeout(() => showSummaryLine(false), SUMMARY_HOLD_MS);
+    ctl.cancel(summaryCycleTimer);
+    summaryCycleTimer = ctl.after(() => showSummaryLine(false), SUMMARY_HOLD_MS);
 }
 
 function showSummaryLine(immediate = false) {
@@ -120,11 +126,12 @@ function showSummaryLine(immediate = false) {
     }
 
     if (lineIdx >= latestLines.length) lineIdx = 0;
+    if (lineIdx === 0 && !immediate && !ctl.boundary()) return; // asked to end after this cycle
     const target = latestLines[lineIdx] ?? '';
     lineIdx = (lineIdx + 1) % latestLines.length;
 
-    clearTimeout(summaryCycleTimer);
-    clearTimeout(summaryTransitionTimer);
+    ctl.cancel(summaryCycleTimer);
+    ctl.cancel(summaryTransitionTimer);
 
     if (immediate) {
         lineEl.classList.remove('is-sliding-out', 'is-sliding-in');
@@ -134,13 +141,13 @@ function showSummaryLine(immediate = false) {
     }
 
     lineEl.classList.add('is-sliding-out');
-    summaryTransitionTimer = setTimeout(() => {
+    summaryTransitionTimer = ctl.after(() => {
         lineEl.innerHTML = target;
         lineEl.classList.remove('is-sliding-out');
         lineEl.classList.add('is-sliding-in');
 
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
+        ctl.frame(() => {
+            ctl.frame(() => {
                 lineEl.classList.remove('is-sliding-in');
             });
         });
@@ -171,7 +178,7 @@ async function refreshSidebar() {
 
     if (lat && lon) {
         await radarInstance.init(lat, lon, 6);
-        requestAnimationFrame(() => radarInstance.resize());
+        ctl.frame(() => radarInstance.resize());
     }
 
     const current = wxData?.weather?.['v3-wx-observations-current'] ?? null;
@@ -203,8 +210,19 @@ async function refreshSidebar() {
     ]);
 }
 
+ctl.define({
+    roots: () => [...document.querySelectorAll('.sidebar-main-location-summary, .sidebar-radar-constant')],
+    start: () => {
+        summaryRunning = false;
+        ctl.frame(() => ctl.frame(refreshSidebar));
+        ctl.every(refreshSidebar, REFRESH_MS);
+    },
+});
+ctl.onStop(() => {
+    summaryRunning = false;
+});
+
 // With the sidebar off, nothing here runs: no data refresh, no sidebar radar map.
 if (sidebarEnabled) {
-    requestAnimationFrame(() => requestAnimationFrame(refreshSidebar));
-    setInterval(refreshSidebar, REFRESH_MS);
+    ctl.start();
 }

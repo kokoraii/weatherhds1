@@ -32,6 +32,9 @@ const LEGENDS = {
 // TWC products whose colours are the TWC precipitation key. Its satellite products have no key.
 const TWC_RADAR = new Set(["radar", "twcRadarMosaic", "twcRadarHcMosaic", "satrad"]);
 
+// The ECCC End-use Licence requires this credit wherever its radar data is shown.
+const ECCC_CREDIT = "Data Source: Environment and Climate Change Canada";
+
 /** The data source a product id comes from, or null for imagery without a colour key. */
 function sourceOf(product) {
     const prefix = product.split(":", 1)[0];
@@ -41,7 +44,7 @@ function sourceOf(product) {
 
 /**
  * Fills a legend container with the keys of every source in a layer stack (bottom first, as in config),
- * top layer's key first, separated by dividers.
+ * top layer's key first, separated by dividers. When ECCC radar is in the stack, its licence credit ends the legend.
  * @param {HTMLElement} container
  * @param {{ product: string }[]} layers
  */
@@ -49,7 +52,7 @@ export function renderRadarLegend(container, layers) {
     const sources = [...new Set(layers.map(layer => sourceOf(layer.product)).filter(Boolean))].reverse();
     const sections = sources.flatMap(source => LEGENDS[source]);
 
-    container.replaceChildren(...sections.flatMap((section, index) => {
+    const parts = sections.flatMap((section, index) => {
         const element = document.createElement("div");
         element.className = "radar-legend-section";
 
@@ -74,8 +77,19 @@ export function renderRadarLegend(container, layers) {
             element.append(ends);
         }
         if (index === 0) return [element];
-        const divider = document.createElement("div");
-        divider.className = "radar-legend-divider";
-        return [divider, element];
-    }));
+        return [dividerElement(), element];
+    });
+    if (sources.includes("eccc")) {
+        const credit = document.createElement("span");
+        credit.className = "radar-legend-credit";
+        credit.textContent = ECCC_CREDIT;
+        parts.push(dividerElement(), credit);
+    }
+    container.replaceChildren(...parts);
+}
+
+function dividerElement() {
+    const divider = document.createElement("div");
+    divider.className = "radar-legend-divider";
+    return divider;
 }

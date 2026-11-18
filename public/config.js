@@ -89,7 +89,6 @@ export let config = {
 
     "music": {
       "enabled": true,
-      "websocketPath": "/music/ws",
       "artPath": "/music/art",
       "showWhenStopped": false,
       "ducking": {
@@ -272,6 +271,32 @@ export const locationConfig = {
         "Gravelbourg, SK",
       ]
     },
+  },
+
+  highwayRoutes: {
+    "local": [
+      {
+        "name": "Saskatchewan Highway 11",
+        "knownAs": "Louis Riel Trail",
+        "orientation": "northSouth",
+        "majorCities": ["Regina, SK", "Saskatoon, SK", "Prince Albert, SK"],
+        "serviceLocales": ["",],
+      },
+      {
+        "name": "Saskatchewan Highway 16",
+        "knownAs": "Trans-Canada Yellowhead Highway",
+        "orientation": "westEast",
+        "majorCities": ["Lloydminster, SK", "North Battleford, SK", "Saskatoon, SK", "Yorkton"],
+        "serviceLocales": ["",],
+      },
+      {
+        "name": "Saskatchewan Highway 11",
+        "knownAs": "Louis Riel Trail",
+        "orientation": "northSouth",
+        "majorCities": ["Regina, SK", "Saskatoon, SK", "Prince Albert, SK"],
+        "serviceLocales": ["",],
+      },
+    ],
   },
 
   nationalLocations: { // 12 cities each. sort by province, then by population. these are used for the national weather slides showed on main.

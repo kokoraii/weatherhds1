@@ -1,6 +1,9 @@
 import { config } from "../config.js";
 import { renderRadarLegend } from "./radar-legends.js";
+import { addMapSymbols, loadMapSymbols, provideMapSymbols } from "./map-symbols.js";
+import { limitPlaceLabels } from "./map-places.js";
 import { setSteadyText } from "./steady-digits.js";
+import { presentations } from "./presentation.js";
 
 // On-screen radars. The picture is three stacked layers inside each container:
 //   base map (land, water, roads) < radar canvas (the Rust engine in /radar) < label map (borders, place names)
@@ -22,6 +25,7 @@ const DEFAULTS = {
     labelTextSize: 40,
     sizeHint: [1, 1], // expected share of the window, used to plan tiles while the container is hidden
     tileDetail: 1, // zoom levels above the map's to fetch: 1 draws tiles 1:1, 0 at 2x for a quarter of the memory
+    presentation: null, // the presentation (presentation.js) this radar belongs to: it freezes while that is paused
 };
 
 const log = () => `[radar.js] | ${new Date().toLocaleString()} |`;
@@ -99,6 +103,9 @@ function loadBordersReader() {
     return bordersPromise;
 }
 
+let symbolsPromise = null;
+const loadSymbols = () => (symbolsPromise ??= loadMapSymbols());
+
 let stylePromise = null;
 const loadStyle = (url) => (stylePromise ??= fetch(url).then((res) => res.json()));
 
@@ -108,9 +115,10 @@ function splitStyle(style, labelTextSize, hasBorders) {
         (l) => l.type === "symbol" || l.id.includes("boundary") || l.id.includes("border"),
     );
     const labels = structuredClone(style.layers.slice(split)).filter((layer) => hasBorders || layer.source !== "borders");
+    limitPlaceLabels(labels);
     for (const layer of labels) {
         if (layer.type === "symbol" && layer.layout?.["text-size"]) {
-            layer.layout["text-size"] = layer.id === "road-shield" ? 18 : labelTextSize;
+            layer.layout["text-size"] = labelTextSize;
         }
     }
     return {
@@ -210,8 +218,9 @@ export class RadarMap {
 
     async #createMaps(center, zoom) {
         const container = this.#getContainer();
-        const [style, hasBorders] = await Promise.all([loadStyle(this.#opts.mapStyle), loadBordersReader()]);
+        const [style, hasBorders, symbols] = await Promise.all([loadStyle(this.#opts.mapStyle), loadBordersReader(), loadSymbols()]);
         const { base, labels } = splitStyle(style, this.#opts.labelTextSize, hasBorders);
+        addMapSymbols(labels, symbols);
         const mapOptions = {
             center,
             zoom,
@@ -226,6 +235,7 @@ export class RadarMap {
         this.#labelsEl = coverElement(document.createElement("div"), 2);
         container.append(this.#labelsEl);
         this.#labelMap = new maplibregl.Map({ ...mapOptions, container: this.#labelsEl, style: labels });
+        provideMapSymbols(this.#labelMap);
 
         this.#baseMap.on("move", () => {
             this.#labelMap.jumpTo({ center: this.#baseMap.getCenter(), zoom: this.#baseMap.getZoom() });
@@ -307,7 +317,7 @@ export class RadarMap {
 
     // Called from the animation loop.
     drawFrame(now) {
-        if (!this.#surface || !this.#isVisible()) return;
+        if (!this.#surface || !this.#isVisible() || this.#opts.presentation?.paused) return;
         const { lat, lng } = this.#baseMap.getCenter();
         const { width, height } = this.#size;
         const ts = this.#surface.render(now, lat, lng, this.#baseMap.getZoom(), width, height, window.devicePixelRatio);
@@ -319,6 +329,7 @@ export class RadarMap {
 }
 
 const mainRadar = new RadarMap("radar-map", {
+    presentation: presentations.main,
     timeElement: document.getElementById("main-radar-time"),
 });
 renderRadarLegend(document.getElementById("main-radar-legend"), DEFAULTS.layers);

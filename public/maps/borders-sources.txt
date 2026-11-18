@@ -10,3 +10,9 @@ United States: counties, Cartographic Boundary Files 2023, 1:5,000,000.
 Rest of the world: geoBoundaries Comprehensive Global Administrative Zones (CGAZ), ADM2.
   Runfola et al. (2020), geoBoundaries: A global database of political administrative boundaries. PLoS ONE.
   https://www.geoboundaries.org/ Licensed CC BY 4.0.
+
+Sources for provinces.json (picks each province's highway shield), built by scripts/build-provinces.py.
+
+Canada: provinces and territories, geoBoundaries gbOpen CAN ADM1 (simplified), from Statistics Canada.
+  Contains information licensed under the Open Government Licence - Canada (Statistics Canada).
+  https://www.geoboundaries.org/

@@ -1,14 +1,28 @@
 package server
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 )
 
+// backgroundRotation is how often the on-air background changes. Every feed shows the same one: each
+// change is sent to the pages (health backgroundSync).
+const backgroundRotation = time.Hour
+
+// BackgroundState is the on-air background, as the pages are told it.
+type BackgroundState struct {
+	Image  string `json:"image"`  // a path under public/, or "" for none
+	Hidden bool   `json:"hidden"` // hideBackground: the wallpaper fades out
+}
+
+// BackgroundManager picks the on-air background: a random one for the season and weather, rotated
+// hourly, unless one is pinned with setBackground.
 type BackgroundManager struct {
 	mu           sync.RWMutex
 	publicDir    string
@@ -17,6 +31,9 @@ type BackgroundManager struct {
 	selectedCond string
 	initialized  string
 	tickerStop   chan struct{}
+	pinned       string // setBackground; "" rotates
+	hidden       bool
+	onChange     func(BackgroundState)
 }
 
 func NewBackgroundManager(publicDir string) *BackgroundManager {
@@ -27,17 +44,25 @@ func NewBackgroundManager(publicDir string) *BackgroundManager {
 	}
 }
 
+// OnChange sets what happens whenever the on-air background changes. Set it before Init.
+func (b *BackgroundManager) OnChange(notify func(BackgroundState)) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.onChange = notify
+}
+
 func (b *BackgroundManager) Init(wxCond string) bool {
 	if wxCond == "" {
 		wxCond = "wxgood"
 	}
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if b.initialized == wxCond {
+		b.mu.Unlock()
 		return true
 	}
 	picked := b.pickExistingBackgroundLocked(wxCond)
 	if picked == "" {
+		b.mu.Unlock()
 		return false
 	}
 	b.selected = picked
@@ -49,11 +74,13 @@ func (b *BackgroundManager) Init(wxCond string) bool {
 	stop := make(chan struct{})
 	b.tickerStop = stop
 	go b.rotate(stop, wxCond)
+	b.mu.Unlock()
+	b.changed()
 	return true
 }
 
 func (b *BackgroundManager) rotate(stop <-chan struct{}, wxCond string) {
-	ticker := time.NewTicker(24 * time.Second)
+	ticker := time.NewTicker(backgroundRotation)
 	defer ticker.Stop()
 	for {
 		select {
@@ -65,14 +92,91 @@ func (b *BackgroundManager) rotate(stop <-chan struct{}, wxCond string) {
 			if picked != "" {
 				b.selected = picked
 			}
+			pinned := b.pinned != ""
 			b.mu.Unlock()
+			if !pinned {
+				b.changed()
+			}
 		}
+	}
+}
+
+// State is the on-air background.
+func (b *BackgroundManager) State() BackgroundState {
+	image := b.CurrentImage()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return BackgroundState{Image: image, Hidden: b.hidden}
+}
+
+// Pin puts one image on air until another is pinned, or "auto" returns to rotation. The path is relative
+// to public/, e.g. images/bg_images/winter/wxgood/lake.avif. Pinning also shows a hidden background.
+func (b *BackgroundManager) Pin(image string) error {
+	b.mu.Lock()
+	if image == "auto" {
+		b.pinned = ""
+	} else {
+		image = "/" + strings.TrimPrefix(filepath.ToSlash(image), "/")
+		absolute := filepath.Join(b.publicDir, filepath.FromSlash(strings.TrimPrefix(image, "/")))
+		if !isPathInPublicDir(b.publicDir, absolute) || !fileExists(absolute) || !isBackgroundImage(absolute) {
+			b.mu.Unlock()
+			return fmt.Errorf("no background image at %s", image)
+		}
+		b.pinned = image
+	}
+	b.hidden = false
+	b.mu.Unlock()
+	b.changed()
+	return nil
+}
+
+// Hide fades the background out on every page until one is pinned again (Pin, including "auto").
+func (b *BackgroundManager) Hide() {
+	b.mu.Lock()
+	b.hidden = true
+	b.mu.Unlock()
+	b.changed()
+}
+
+// Reindex rescans the background folders, after a change set adds or replaces images.
+func (b *BackgroundManager) Reindex() {
+	index := buildBackgroundIndex(b.publicDir)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.index = index
+}
+
+// Images lists every background, relative to public/, for completion.
+func (b *BackgroundManager) Images() []string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	var images []string
+	for _, conditions := range b.index {
+		for _, list := range conditions {
+			for _, image := range list {
+				images = append(images, strings.TrimPrefix(image, "/"))
+			}
+		}
+	}
+	slices.Sort(images)
+	return images
+}
+
+func (b *BackgroundManager) changed() {
+	b.mu.RLock()
+	notify := b.onChange
+	b.mu.RUnlock()
+	if notify != nil {
+		notify(b.State())
 	}
 }
 
 func (b *BackgroundManager) CurrentImage() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.pinned != "" {
+		return b.pinned
+	}
 	if b.selected == "" {
 		return ""
 	}
@@ -145,10 +249,7 @@ func buildBackgroundIndex(publicDir string) map[string]map[string][]string {
 				if file.IsDir() {
 					continue
 				}
-				ext := strings.ToLower(filepath.Ext(file.Name()))
-				switch ext {
-				case ".avif", ".webp", ".png", ".jpg", ".jpeg":
-				default:
+				if !isBackgroundImage(file.Name()) {
 					continue
 				}
 				absolute := filepath.Join(conditionPath, file.Name())
@@ -162,6 +263,14 @@ func buildBackgroundIndex(publicDir string) map[string]map[string][]string {
 		}
 	}
 	return index
+}
+
+func isBackgroundImage(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".avif", ".webp", ".png", ".jpg", ".jpeg":
+		return true
+	}
+	return false
 }
 
 func normalizeCondition(value string) string {

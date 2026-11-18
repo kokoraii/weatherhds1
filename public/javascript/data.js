@@ -1,7 +1,7 @@
 export let imageIndex;
 export let locationsList;
 export let units;
-export let serverHealth = 0; // if set to one then that means the heartbeat failed and the client SHOULD fallback to client-side slides. keyword 'SHOULD' because im a horrible coder.
+export let serverHealth = 0; // 1 when the server is unreachable: the client falls back to its standby slides. Set by health.js.
 
 let onlineBg;
 let bgUrl;
@@ -10,8 +10,12 @@ const REQUEST_CACHE_MS = 2 * 60 * 1000;
 const requestCache = new Map();
 const inFlightRequests = new Map();
 
-import { runInitialLDL, requestBulletinCrawl, cancelBulletinCrawl } from "./ldl.js";
+import { requestBulletinCrawl, cancelBulletinCrawl } from "./ldl.js";
 import { config, serverConfig, locationConfig } from "../config.js";
+import { beforeRebuild, presentations } from "./presentation.js";
+
+// A rebuilt presentation fetches fresh weather rather than the last two minutes' cache.
+beforeRebuild(() => requestCache.clear());
 
 async function cachedJSONRequest(key, url, options = {}) {
   const now = Date.now();
@@ -122,23 +126,13 @@ export async function fetchOnlineBackground() {
   }
 }
 
-export async function areWeDead() {
-  try {
-    const response = await fetch('/heartbeat');
-    const data = await response.json();
-
-    serverHealth = 0;
-    return serverHealth;
-  } catch (error) {
-    console.error(logTheFrickinTime, 'Error fetching heartbeat:', error);
-    serverHealth = 1;
-    return serverHealth;
+// health.js sets this from the server's heartbeat on the event channel.
+export function setServerHealth(value) {
+  if (value !== serverHealth) {
+    console.log(logTheFrickinTime, value === 0 ? "Server is back." : "Server unreachable; falling back to standby.");
   }
+  serverHealth = value;
 }
-
-
-areWeDead()
-setInterval(areWeDead, 30000);
 
 let alertRegistry = {};
 let alertPollTimer = null;
@@ -189,6 +183,6 @@ async function checkAlerts() {
 checkAlerts();
 
 if (config.presentationConfig.ldl) {
-  runInitialLDL();
+  presentations.ldl.start();
 }
 

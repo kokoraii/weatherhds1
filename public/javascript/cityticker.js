@@ -1,4 +1,5 @@
 import { weatherIcons, locationConfig, serverConfig, config, displayUnits } from "../config.js";
+import { presentations } from "./presentation.js";
 import { requestWxData, requestAlertData } from "./data.js";
 import { weatherIconUrl } from "./icons.js";
 
@@ -327,6 +328,7 @@ class CityTickerScroller {
     #advance() {
         this.#queueIndex++;
         if (this.#queueIndex >= this.#queue.length) {
+            if (!ctl.boundary()) return; // asked to end after this cycle; stopping stops this scroller
             this.#cycleCount++;
             this.#rebuildQueue();
         }
@@ -343,9 +345,17 @@ class CityTickerScroller {
 
     #sleep(ms) {
         return new Promise(resolve => {
-            const timer = setTimeout(resolve, ms);
-            this.#wake = () => { clearTimeout(timer); resolve(); };
+            const timer = ctl.after(resolve, ms);
+            this.#wake = () => { ctl.cancel(timer); resolve(); };
         });
+    }
+
+    pause() {
+        for (const animation of this.#animations) animation.pause();
+    }
+
+    resume() {
+        for (const animation of this.#animations) animation.play();
     }
 
     #cancelAnimations() {
@@ -436,15 +446,30 @@ async function buildCityTicker() {
     const viewport = document.querySelector(".cityticker-body");
     const track = viewport.querySelector(".cityticker-track");
 
-    const { dataMap, alertMap } = await fetchSectionData(categories);
+    const { dataMap, alertMap } = await ctl.guard(fetchSectionData(categories));
     const byProduct = buildSections(categories, dataMap, alertMap, products);
 
     const hasContent = products.some(p => (byProduct[p] ?? []).some(s => s.entries.length > 0));
     if (!hasContent) return;
 
-    new CityTickerScroller(viewport, track, byProduct, products, messages).start();
+    scroller = new CityTickerScroller(viewport, track, byProduct, products, messages);
+    scroller.start();
 }
 
+// The ticker is a presentation of its own (presentation.js): the server can pause, stop or rebuild it.
+const ctl = presentations.cityticker;
+let scroller = null;
+ctl.define({
+    roots: () => [document.querySelector(".cityticker")],
+    start: buildCityTicker,
+});
+ctl.onPause(() => scroller?.pause());
+ctl.onResume(() => scroller?.resume());
+ctl.onStop(() => {
+    scroller?.stop();
+    scroller = null;
+});
+
 document.addEventListener("DOMContentLoaded", () => {
-    buildCityTicker();
+    if (config.cityTicker?.enabled) ctl.start();
 });

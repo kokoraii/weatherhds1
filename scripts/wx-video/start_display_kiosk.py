@@ -28,8 +28,8 @@ import time
 import urllib.error
 import urllib.request
 
-DEFAULT_SD_URL = "http://localhost:3000?videoType=vga&sidebar=false"
-DEFAULT_HD_URL = "http://localhost:3000?videoType=hdtv"
+DEFAULT_SD_URL = "http://localhost:3000?videoType=vga&sidebar=false&feed=sd"
+DEFAULT_HD_URL = "http://localhost:3000?videoType=hdtv&feed=hd"
 DEFAULT_SD_MODE = "800x600"
 DEFAULT_HD_MODE = "1920x1080"
 DEFAULT_DISPLAY = ":0"

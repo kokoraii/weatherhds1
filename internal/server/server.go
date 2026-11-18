@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -18,6 +19,8 @@ import (
 	"syscall"
 	"time"
 
+	"weatherhds/internal/changeset"
+	"weatherhds/internal/console"
 	"weatherhds/internal/music"
 	"weatherhds/internal/vocallocal"
 
@@ -27,7 +30,14 @@ import (
 )
 
 func Run(ctx context.Context, embeddedWebroot fs.FS) error {
-	logger := bootLogger()
+	// Ctrl+C or a service stop ends ctx, which tells the pages (shutDown) before the servers close.
+	ctx, stopSignals := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	ctx, stopServer := context.WithCancel(ctx)
+	defer stopServer()
+	started := time.Now()
+	broker := console.NewBroker(os.Stdout)
+	logger := bootLogger(broker)
 	workspaceDir, err := os.Getwd()
 	if err != nil {
 		return err
@@ -41,7 +51,7 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	cfg := loadConfig(runtimePaths.ConfigPath)
 	publicDir := runtimePaths.PublicDir
 	versionID := loadVersionFromConfig(runtimePaths.ConfigPath)
-	printStartupArt()
+	printStartupArt(broker)
 	logInfo(logger, "server", "==========================================================================================================")
 	logInfo(logger, "server", "WeatherHDS Server v%s", versionID)
 	logInfo(logger, "server", "Created by raiii. (c) SSPWXR/raii 2025")
@@ -84,6 +94,17 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	}
 	defer musicService.Close()
 	musicService.Start(ctx)
+	zone := stationZone(cfg.SystemTimeZone)
+	videosDir := filepath.Join(workspaceDir, "Videos")
+	if err := os.MkdirAll(videosDir, 0o755); err != nil {
+		return err
+	}
+	hub, dispatcher := newChannel(versionID, logger, musicService, backgrounds, zone, videosDir)
+	stage := changeset.Open(workspaceDir)
+	handleChangeSets(dispatcher, stage, backgrounds)
+	go hub.Run(ctx)
+	go runHolidaySync(ctx, hub, zone)
+	startConsole(ctx, stopServer, cfg, runtimePaths, versionID, started, logger, broker, dispatcher, musicService, backgrounds, videosDir)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -98,7 +119,7 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 				status = http.StatusOK
 			}
 			elapsed := time.Since(start)
-			isLongLived := c.Request().URL.Path == "/music/ws"
+			isLongLived := c.Request().URL.Path == "/events"
 			isError := status >= http.StatusInternalServerError || (err != nil && status >= http.StatusBadRequest)
 			if isError || (!isLongLived && elapsed >= 500*time.Millisecond) {
 				logInfo(logger, "server/http", "HTTP %s %s %d %s", c.Request().Method, c.Request().URL.Path, status, elapsed.Round(time.Millisecond))
@@ -251,10 +272,7 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 		}
 		return c.JSON(http.StatusOK, response)
 	})
-	e.GET("/music/ws", func(c echo.Context) error {
-		musicService.HandleWebSocket(c.Response(), c.Request())
-		return nil
-	})
+	e.GET("/events", echo.WrapHandler(hub))
 	e.GET("/music/state", func(c echo.Context) error {
 		musicService.HandleState(c.Response(), c.Request())
 		return nil
@@ -265,6 +283,7 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	})
 	e.File("/", filepath.Join(publicDir, "index.html"))
 	e.Static("/persistentCache", filepath.Join(workspaceDir, "persistentCache"))
+	e.Static(videosRoute, videosDir)
 	e.Static("/", publicDir)
 
 	port := cfg.WebPort
@@ -284,6 +303,8 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 		defer stopServers()
 		go func() {
 			<-serverCtx.Done()
+			logInfo(logger, "server", "Shutting down")
+			hub.Shutdown("server stopping")
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			_ = httpServer.Shutdown(shutdownCtx)
@@ -291,10 +312,10 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 
 		// The admin panel is optional: if its port can't be bound (ports below 1024 need privileges on Linux),
 		// log it and keep serving the display instead of exiting.
-		if adminListener, adminErr := net.Listen("tcp", ":"+strconv.Itoa(adminPort)); adminErr != nil {
-			logInfo(logger, "server", "Admin panel disabled, cannot listen on port %d: %v", adminPort, adminErr)
+		if adminListener, adminErr := net.Listen("tcp", ":"+strconv.Itoa(cfg.AdminPort)); adminErr != nil {
+			logInfo(logger, "server", "Admin panel disabled, cannot listen on port %d: %v", cfg.AdminPort, adminErr)
 		} else {
-			adminServer := &http.Server{Handler: newAdminHandler(runtimePaths.AdminDir), ReadHeaderTimeout: 10 * time.Second}
+			adminServer := &http.Server{Handler: newAdminHandler(runtimePaths.AdminDir, dispatcher, stage), ReadHeaderTimeout: 10 * time.Second}
 			go func() {
 				<-serverCtx.Done()
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -302,18 +323,21 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 				_ = adminServer.Shutdown(shutdownCtx)
 			}()
 			go func() {
-				logInfo(logger, "server", "Admin panel listening on http://localhost:%d", adminPort)
+				logInfo(logger, "server", "Admin panel listening on http://localhost:%d", cfg.AdminPort)
 				if serveErr := adminServer.Serve(adminListener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 					logInfo(logger, "server", "Admin panel server stopped: %v", serveErr)
 				}
 			}()
 		}
-		return httpServer.Serve(listener)
+		if serveErr := httpServer.Serve(listener); !errors.Is(serveErr, http.ErrServerClosed) {
+			return serveErr
+		}
+		return nil
 	}
 }
 
 func loadConfig(configPath string) AppConfig {
-	cfg := AppConfig{Units: "m", WebPort: 3000, CacheValidTime: 720}
+	cfg := AppConfig{Units: "m", WebPort: 3000, AdminPort: 1005, SSHPort: 1015, CacheValidTime: 720}
 	payload, err := os.ReadFile(configPath)
 	if err == nil {
 		serverConfig := extractJSObjectAssignment(string(payload), "serverConfig")
@@ -327,6 +351,7 @@ func loadConfig(configPath string) AppConfig {
 			cfg.CacheValidTime = value
 		}
 		cfg.DataProvider = extractJSString(serverConfig, "dataProvider")
+		cfg.SystemTimeZone = extractJSString(extractJSObjectAssignment(string(payload), "config"), "systemTimeZone")
 		cfg.MusicLoudness = extractJSString(serverConfig, "musicLoudness")
 	}
 	if value := strings.TrimSpace(os.Getenv("UNITS")); value != "" {
@@ -341,6 +366,16 @@ func loadConfig(configPath string) AppConfig {
 	if value := strings.TrimSpace(os.Getenv("WEB_PORT")); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
 			cfg.WebPort = parsed
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("ADMIN_PORT")); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
+			cfg.AdminPort = parsed
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("SSH_PORT")); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
+			cfg.SSHPort = parsed
 		}
 	}
 	if value := strings.TrimSpace(os.Getenv("CACHE_VALID_TIME")); value != "" {
@@ -390,9 +425,9 @@ func extractJSInt(source string, key string) int {
 func staticCacheHeaders(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		path := c.Request().URL.Path
-		if strings.HasPrefix(path, "/wasm/") || path == "/" || strings.HasSuffix(path, ".html") {
-			// The wasm glue script and binary must match, or the radar engine fails to load. The page must
-			// match its scripts too; without a header, browsers guess a lifetime and keep a stale copy.
+		if mustRevalidate(path) {
+			// Code and data must always match each other: one stale module (a script cached from before an
+			// update) can break a whole feature. Revalidating costs a 304 from this local server.
 			c.Response().Header().Set("Cache-Control", "no-cache")
 		} else if isCacheableStaticPath(path) {
 			c.Response().Header().Set("Cache-Control", "public, max-age=3600")
@@ -401,13 +436,24 @@ func staticCacheHeaders(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-func isCacheableStaticPath(path string) bool {
-	if path == "/" || path == "/config.js" || path == "/heartbeat" {
+// mustRevalidate reports paths the browser must check before reusing: the page, its scripts, styles and
+// data, and the radar engine's wasm glue and binary.
+func mustRevalidate(path string) bool {
+	if path == "/" || strings.HasPrefix(path, "/wasm/") {
+		return true
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".html", ".js", ".mjs", ".css", ".json":
+		return true
+	default:
 		return false
 	}
-	extension := strings.ToLower(filepath.Ext(path))
-	switch extension {
-	case ".avif", ".webp", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".css", ".js", ".ogg", ".wav", ".json":
+}
+
+// isCacheableStaticPath reports media that rarely changes, kept for an hour.
+func isCacheableStaticPath(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".avif", ".webp", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ogg", ".wav", ".ttf", ".woff2":
 		return true
 	default:
 		return false

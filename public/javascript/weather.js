@@ -3,6 +3,10 @@ import { weatherIcons, locationConfig, serverConfig, config, displayUnits } from
 import { drawMap } from './radar.js';
 import { isVocallocalEnabled, prefetchMainVocallocal } from './vocallocal.js'
 import { weatherIconUrl } from './icons.js'
+import { presentations } from './presentation.js'
+
+// The main presentation's slides draw from here; their timers pause with it.
+const ctl = presentations.main
 
 export const upNextLocationText = document.getElementById('upnext-location');
 export const currentLocationText = document.getElementById('current-location');
@@ -66,7 +70,7 @@ function setWeatherBackground(el, cssVarName, url) {
 function typewriterInto(el, text, charMs = FORECAST_CHAR_MS) {
     const prev = forecastTypewriterTimers.get(el)
     if (prev) {
-        clearTimeout(prev)
+        ctl.cancel(prev)
         forecastTypewriterTimers.delete(el)
     }
 
@@ -76,7 +80,7 @@ function typewriterInto(el, text, charMs = FORECAST_CHAR_MS) {
     const step = () => {
         if (i <= text.length) {
             el.textContent = text.slice(0, i++)
-            forecastTypewriterTimers.set(el, setTimeout(step, charMs))
+            forecastTypewriterTimers.set(el, ctl.after(step, charMs))
         } else {
             forecastTypewriterTimers.delete(el)
         }
@@ -164,7 +168,7 @@ export function renderShortTermPeriod(periodIndex, animate = false) {
         } else {
             const prev = forecastTypewriterTimers.get(textEl)
             if (prev) {
-                clearTimeout(prev)
+                ctl.cancel(prev)
                 forecastTypewriterTimers.delete(textEl)
             }
             textEl.textContent = period.narrative || ''
@@ -181,8 +185,8 @@ export function renderShortTermPeriod(periodIndex, animate = false) {
 }
 
 export function stopShortTermProduct() {
-    clearTimeout(shortTermPagerTimer)
-    clearTimeout(shortTermTransitionTimer)
+    ctl.cancel(shortTermPagerTimer)
+    ctl.cancel(shortTermTransitionTimer)
     shortTermPagerTimer = null
     shortTermTransitionTimer = null
 
@@ -208,7 +212,7 @@ export function runShortTermProduct(durationMS = 14000) {
         container.style.transition = 'none'
         container.style.opacity = '0'
         container.style.transform = 'translateX(24px)'
-        setTimeout(() => {
+        ctl.after(() => {
             container.style.transition = 'opacity 0.4s ease, transform 0.4s ease'
             container.style.opacity = '1'
             container.style.transform = 'translateX(0)'
@@ -228,7 +232,7 @@ export function runShortTermProduct(durationMS = 14000) {
             container.style.opacity = '0'
             container.style.transform = 'translateX(-24px)'
 
-            shortTermTransitionTimer = setTimeout(() => {
+            shortTermTransitionTimer = ctl.after(() => {
                 renderShortTermPeriod(index, true)
                 container.style.transform = 'translateX(24px)'
                 container.style.transition = 'none'
@@ -240,11 +244,11 @@ export function runShortTermProduct(durationMS = 14000) {
         }
 
         if (index < count - 1) {
-            shortTermPagerTimer = setTimeout(page, perPeriod)
+            shortTermPagerTimer = ctl.after(page, perPeriod)
         }
     }
 
-    shortTermPagerTimer = setTimeout(page, perPeriod)
+    shortTermPagerTimer = ctl.after(page, perPeriod)
 }
 
 export function formatTime(timeString) {
@@ -712,6 +716,10 @@ export async function appendDatatoMain(locale, locType) {
 
 const sliderScaleE = { min: -58, max: 122, range: 180 };
 const sliderScaleM = { min: -50, max: 50, range: 100 };
+
+// The intraday bars are Web Animations, which CSS can't pause.
+ctl.onPause(() => intradayAnimations.forEach(anim => anim.pause()))
+ctl.onResume(() => intradayAnimations.forEach(anim => anim.play()))
 
 export function animateIntraday() {
     for (const anim of intradayAnimations) {

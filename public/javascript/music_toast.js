@@ -1,4 +1,8 @@
 import { config } from "../config.js";
+import { isConnected, on, onConnect, onDisconnect, send } from "./events.js";
+
+// The music player: the server streams audio over WebRTC, signalled on the page's event channel
+// (events.js), and pushes "state" and "track" messages that fill the sidebar toast.
 
 const musicConfig = config.music ?? {};
 const duckingConfig = musicConfig.ducking ?? {};
@@ -27,9 +31,7 @@ audio.style.pointerEvents = "none";
 audio.style.left = "-9999px";
 document.body?.appendChild(audio);
 
-let socket = null;
 let peer = null;
-let reconnectTimer = null;
 let progressTimer = null;
 let volumeAnimation = null;
 let serverElapsed = 0;
@@ -39,10 +41,19 @@ let currentTrackId = "";
 let targetVolume = 1;
 let peerReconnectTimer = null;
 
+// The server attaches music to every page; a page with music off just ignores it.
+on("music", message => {
+    if (musicConfig.enabled) return handleMessage(message);
+});
 if (!musicConfig.enabled) {
     hideToast();
 } else {
-    connect();
+    onConnect(() => {
+        createPeer().catch(error => {
+            console.warn("[music_toast.js] WebRTC startup failed:", error);
+        });
+    });
+    onDisconnect(closePeer);
 }
 
 function hideToast() {
@@ -220,43 +231,6 @@ function crossfade(statePayload) {
     }, 250);
 }
 
-function websocketURL(path) {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}${path || "/music/ws"}`;
-}
-
-function send(message) {
-    if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify(message));
-    }
-}
-
-function connect() {
-    clearTimeout(reconnectTimer);
-    socket = new WebSocket(websocketURL(musicConfig.websocketPath));
-    socket.addEventListener("open", () => {
-        send({ type: "hello" });
-        createPeer().catch(error => {
-            console.warn("[music_toast.js] WebRTC startup failed:", error);
-        });
-    });
-    socket.addEventListener("message", event => {
-        try {
-            handleMessage(JSON.parse(event.data));
-        } catch (error) {
-            console.warn("[music_toast.js] Ignoring malformed music message:", error);
-        }
-    });
-    socket.addEventListener("close", reconnect);
-    socket.addEventListener("error", reconnect);
-}
-
-function reconnect() {
-    closePeer();
-    clearTimeout(reconnectTimer);
-    reconnectTimer = setTimeout(connect, 3000);
-}
-
 async function createPeer() {
     closePeer();
     const pc = new RTCPeerConnection({ iceServers: [] });
@@ -270,7 +244,7 @@ async function createPeer() {
     };
     pc.onicecandidate = event => {
         if (event.candidate) {
-            send({ type: "webrtc.ice", candidate: event.candidate.toJSON() });
+            send("music", "ice", { candidate: event.candidate.toJSON() });
         }
     };
     pc.onconnectionstatechange = () => {
@@ -283,7 +257,7 @@ async function createPeer() {
             if (peer === pc) {
                 closePeer();
             }
-            if (socket?.readyState === WebSocket.OPEN) {
+            if (isConnected()) {
                 setTimeout(() => {
                     createPeer().catch(error => {
                         console.warn("[music_toast.js] WebRTC reconnect failed:", error);
@@ -297,7 +271,7 @@ async function createPeer() {
                 peerReconnectTimer = null;
                 if (peer === pc && pc.connectionState === "disconnected") {
                     closePeer();
-                    if (socket?.readyState === WebSocket.OPEN) {
+                    if (isConnected()) {
                         createPeer().catch(error => {
                             console.warn("[music_toast.js] WebRTC reconnect failed:", error);
                         });
@@ -308,7 +282,7 @@ async function createPeer() {
     };
     const offer = enableOpusStereo(await pc.createOffer());
     await pc.setLocalDescription(offer);
-    send({ type: "webrtc.offer", sdp: pc.localDescription });
+    send("music", "offer", { sdp: pc.localDescription });
 }
 
 function enableOpusStereo(description) {
@@ -355,25 +329,26 @@ function forceOpusStereoParameters(parameters) {
 }
 
 async function handleMessage(message) {
-    switch (message.type) {
+    const args = message.args ?? {};
+    switch (message.command) {
         case "state":
-            applyState(message.state);
+            applyState(args);
             break;
-        case "track_change":
-            crossfade(message.state);
+        case "track":
+            crossfade(args);
             break;
-        case "webrtc.answer":
-            if (peer && message.sdp) {
-                await peer.setRemoteDescription(message.sdp);
+        case "answer":
+            if (peer && args.sdp) {
+                await peer.setRemoteDescription(args.sdp);
             }
             break;
-        case "webrtc.ice":
-            if (peer && message.candidate) {
-                await peer.addIceCandidate(message.candidate);
+        case "ice":
+            if (peer && args.candidate) {
+                await peer.addIceCandidate(args.candidate);
             }
             break;
         case "error":
-            console.warn("[music_toast.js]", message.message);
+            console.warn("[music_toast.js]", args.message);
             break;
     }
 }

@@ -6,6 +6,7 @@
 .DS_Store
 .vscode
 /Music/
+/Videos/
 build
 weatherhds.exe
 ./weatherhds-server.err.log

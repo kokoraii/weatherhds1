@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"math/rand"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +32,7 @@ func TestNewServiceCreatesMissingMusicDir(t *testing.T) {
 	}
 }
 
-func TestScanLibraryFindsOpusOggAndSkipsUnsupported(t *testing.T) {
+func TestScanLibraryFindsMediaAndSkipsOtherFiles(t *testing.T) {
 	root := t.TempDir()
 	nested := filepath.Join(root, "nested")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
@@ -41,22 +40,31 @@ func TestScanLibraryFindsOpusOggAndSkipsUnsupported(t *testing.T) {
 	}
 
 	writeTinyOgg(t, filepath.Join(nested, "sample.ogg"))
-	if err := os.WriteFile(filepath.Join(root, "unsupported.mp3"), []byte("not decoded in v1"), 0o644); err != nil {
-		t.Fatalf("write unsupported file failed: %v", err)
+	if err := os.WriteFile(filepath.Join(root, "song.mp3"), []byte("played through ffmpeg"), 0o644); err != nil {
+		t.Fatalf("write mp3 failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "notes.txt"), []byte("not media"), 0o644); err != nil {
+		t.Fatalf("write txt failed: %v", err)
 	}
 
 	tracks, unsupported := scanLibrary(root)
-	if len(tracks) != 1 {
-		t.Fatalf("expected one supported track, got %d", len(tracks))
+	var ogg *Track
+	for i := range tracks {
+		if strings.HasSuffix(tracks[i].path, "sample.ogg") {
+			ogg = &tracks[i]
+		}
 	}
-	if tracks[0].Title != "sample" {
-		t.Fatalf("expected filename title fallback, got %q", tracks[0].Title)
+	if len(tracks) != 2 || ogg == nil {
+		t.Fatalf("expected the ogg and the mp3 (ffmpeg plays it), got %d tracks", len(tracks))
 	}
-	if len(unsupported) != 1 || !strings.HasSuffix(unsupported[0], "unsupported.mp3") {
-		t.Fatalf("expected unsupported mp3 to be reported, got %#v", unsupported)
+	if ogg.Title != "sample" {
+		t.Fatalf("expected filename title fallback, got %q", ogg.Title)
+	}
+	if len(unsupported) != 0 {
+		t.Fatalf("other files are skipped, not reported: %#v", unsupported)
 	}
 
-	probed, err := probeTrack(root, tracks[0].path)
+	probed, err := probeTrack(root, ogg.path)
 	if err != nil {
 		t.Fatalf("probeTrack failed: %v", err)
 	}
@@ -155,51 +163,23 @@ func TestNextTrackAvoidsRepeatsBeforeDeckExhaustion(t *testing.T) {
 	}
 }
 
-func TestSameOrigin(t *testing.T) {
-	request := &http.Request{Host: "weather.local:8080", Header: make(http.Header)}
-	if !sameOrigin(request) {
-		t.Fatal("empty Origin should be allowed for non-browser clients")
-	}
-	request.Header.Set("Origin", "http://weather.local:8080")
-	if !sameOrigin(request) {
-		t.Fatal("matching http origin should be allowed")
-	}
-	request.Header.Set("Origin", "https://weather.local:8080")
-	if !sameOrigin(request) {
-		t.Fatal("matching https origin should be allowed")
-	}
-	request.Header.Set("Origin", "http://evil.local:8080")
-	if sameOrigin(request) {
-		t.Fatal("mismatched origin should be rejected")
-	}
+// recordingSender collects what a session sends, for tests.
+type recordingSender struct {
+	commands []string
+	payloads []any
 }
 
-func TestJSONUnmarshalRejectsMalformedAndOversizedMessages(t *testing.T) {
-	var msg wsMessage
-	if err := jsonUnmarshal([]byte(`{"type":"hello"`), &msg); err == nil {
-		t.Fatal("expected malformed JSON to be rejected")
-	}
-	if err := jsonUnmarshal(make([]byte, maxWSMessageBytes+1), &msg); err == nil {
-		t.Fatal("expected oversized message to be rejected")
-	}
+func (r *recordingSender) send(command string, payload any) {
+	r.commands = append(r.commands, command)
+	r.payloads = append(r.payloads, payload)
 }
 
-func TestUnsupportedWebSocketMessageReturnsError(t *testing.T) {
-	client := &client{
-		service: &Service{},
-		send:    make(chan []byte, 1),
-	}
-	client.handleMessage(wsMessage{Type: "pause"})
-
-	var response struct {
-		Type    string `json:"type"`
-		Message string `json:"message"`
-	}
-	if err := json.Unmarshal(<-client.send, &response); err != nil {
-		t.Fatalf("error response was not JSON: %v", err)
-	}
-	if response.Type != "error" || response.Message != "unsupported message type" {
-		t.Fatalf("unexpected response: %#v", response)
+func TestUnsupportedMusicCommandReturnsError(t *testing.T) {
+	sent := &recordingSender{}
+	session := &Session{service: &Service{}, send: sent.send}
+	session.Handle("pause", nil)
+	if len(sent.commands) != 1 || sent.commands[0] != "error" {
+		t.Fatalf("expected one error, got %v", sent.commands)
 	}
 }
 
@@ -225,24 +205,37 @@ func TestHandleOfferCreatesWebRTCAnswer(t *testing.T) {
 		t.Fatalf("SetLocalDescription failed: %v", err)
 	}
 
-	client := &client{
-		service: &Service{},
-		send:    make(chan []byte, 4),
+	sent := &recordingSender{}
+	session := &Session{service: &Service{}, send: sent.send}
+	defer session.closePeer()
+	offerArgs, err := json.Marshal(map[string]any{"sdp": peer.LocalDescription()})
+	if err != nil {
+		t.Fatalf("marshal offer: %v", err)
 	}
-	defer client.closePeer()
-	if err := client.handleOffer(*peer.LocalDescription()); err != nil {
-		t.Fatalf("handleOffer failed: %v", err)
-	}
+	session.Handle("offer", offerArgs)
 
+	answerIndex := -1
+	for i, command := range sent.commands {
+		if command == "answer" {
+			answerIndex = i
+		}
+	}
+	if answerIndex < 0 {
+		t.Fatalf("no answer sent, got %v", sent.commands)
+	}
+	// The payload is what the page receives: round-trip it through JSON like the channel does.
+	encoded, err := json.Marshal(sent.payloads[answerIndex])
+	if err != nil {
+		t.Fatalf("marshal answer: %v", err)
+	}
 	var response struct {
-		Type string                     `json:"type"`
-		SDP  *webrtc.SessionDescription `json:"sdp"`
+		SDP *webrtc.SessionDescription `json:"sdp"`
 	}
-	if err := json.Unmarshal(<-client.send, &response); err != nil {
-		t.Fatalf("answer response was not JSON: %v", err)
+	if err := json.Unmarshal(encoded, &response); err != nil {
+		t.Fatalf("answer payload was not JSON: %v", err)
 	}
-	if response.Type != "webrtc.answer" || response.SDP == nil {
-		t.Fatalf("unexpected answer response: %#v", response)
+	if response.SDP == nil {
+		t.Fatalf("answer carried no SDP: %s", encoded)
 	}
 	if response.SDP.Type != webrtc.SDPTypeAnswer {
 		t.Fatalf("expected answer SDP, got %s", response.SDP.Type)

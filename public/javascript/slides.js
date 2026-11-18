@@ -6,6 +6,11 @@ import { resizeRadar } from "./radar.js";
 import { getVocallocalQueueForSlide, getVocallocalTotalDurationMsForSlide, isVocallocalEnabled } from "./vocallocal.js";
 import { startMarquee, stopMarquee } from "./marquee.js";
 import { startStationId, endStationId } from "./stationid.js";
+import { presentations } from "./presentation.js";
+
+// The main presentation: the playlist of local slides, bumpers and national segments. Its timing runs
+// through its controller (presentation.js) so the server can pause, stop or rebuild it.
+const ctl = presentations.main;
 
 const playlistSettings = {
     defaultAnimationIn: `mainPresentationSlideIn 500ms ease-in-out`,
@@ -459,14 +464,14 @@ function waitForVocallocalDelay(delayMs, signal) {
 
         let timer = null;
         const done = (completed) => {
-            clearTimeout(timer);
+            ctl.cancel(timer);
             signal?.removeEventListener('abort', onAbort);
             resolve(completed);
         };
         const onAbort = () => done(false);
 
         signal?.addEventListener('abort', onAbort, { once: true });
-        timer = setTimeout(() => done(true), Math.max(0, delayMs));
+        timer = ctl.after(() => done(true), Math.max(0, delayMs));
     });
 }
 
@@ -666,11 +671,6 @@ function buildQueue() {
 }
 
 function runPresentation() {
-    if (config.presentationConfig.main !== true) {
-        console.log(logTheFrickinTime + "Main presentation mode is disabled.");
-        return;
-    }
-
     const queue = buildQueue();
     if (queue.length === 0) return;
 
@@ -678,6 +678,7 @@ function runPresentation() {
 
     function next() {
         if (idx >= queue.length) {
+            if (!ctl.boundary()) return; // asked to end after this pass
             if (config.presentationConfig.repeatMain) {
                 idx = 0;
             } else {
@@ -698,7 +699,7 @@ function runPresentation() {
                 runBumperSlide(item.bumperId, item.upcomingRegions, next);
                 break;
             case "national":
-                runRegionalPlayback(item.regions, next);
+                runRegionalPlayback(item.regions, next, ctl);
                 break;
         }
     }
@@ -707,8 +708,8 @@ function runPresentation() {
 }
 
 async function runSlideSet(locationName, selectedPlaylist, locType, call) {
-    clearTimeout(slideNearEnd);
-    clearTimeout(slideEnd);
+    ctl.cancel(slideNearEnd);
+    ctl.cancel(slideEnd);
 
     if (serverHealth === 1) {
         selectedPlaylist = preferredPlaylist.standbyPlaylist;
@@ -718,8 +719,8 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
     domCache.mainSlides.style.display = "flex";
     domCache.regionalSlides.style.display = "none";
 
-    await appendDatatoMain(locationName, locType);
-    await new Promise(r => setTimeout(r, 300));
+    await ctl.guard(appendDatatoMain(locationName, locType));
+    await ctl.wait(300);
 
     const slides = document.querySelectorAll('.main-slide');
     const bumpers = document.querySelectorAll('.bumper-slide');
@@ -828,13 +829,13 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
             playVocallocalForSlide(slide.htmlID, targetVocallocalGroup);
         }
 
-        slideNearEnd = setTimeout(() => {
+        slideNearEnd = ctl.after(() => {
             if (el) el.style.animation = slide.animationOut;
             slideInfoName.style.animation = 'fadeModule 0.5s ease-in-out forwards';
             slideInfoIcon.style.animation = 'slideDown 160ms ease-in-out forwards';
         }, slideDurationMS - 500);
 
-        slideEnd = setTimeout(() => {
+        slideEnd = ctl.after(() => {
             slideInfoName.style.display = 'none';
             slideInfoName.style.animation = '';
             slideProgressBar.style.display = 'none';
@@ -856,7 +857,7 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
     }
 
     async function waitForShortTermHold(localToken) {
-        await new Promise(resolve => setTimeout(resolve, SHORT_TERM_VOCALLOCAL_HOLD_MS));
+        await ctl.wait(SHORT_TERM_VOCALLOCAL_HOLD_MS);
         return localToken === shortTermSequenceToken;
     }
 
@@ -868,7 +869,7 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
                 container.style.transition = 'none';
                 container.style.opacity = '0';
                 container.style.transform = 'translateX(24px)';
-                setTimeout(() => {
+                ctl.after(() => {
                     container.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
                     container.style.opacity = '1';
                     container.style.transform = 'translateX(0)';
@@ -881,7 +882,7 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
         container.style.opacity = '0';
         container.style.transform = 'translateX(-24px)';
 
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await ctl.wait(200);
 
         renderShortTermPeriod(index, true);
         container.style.transform = 'translateX(24px)';
@@ -898,19 +899,19 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
         for (let index = 0; index < count; index++) {
             if (localToken !== shortTermSequenceToken) return;
 
-            await transitionShortTermPeriod(index);
+            await ctl.guard(transitionShortTermPeriod(index));
             if (localToken !== shortTermSequenceToken) return;
 
             const periodQueueKey = `forecast-shortterm-${index}`;
             stopVocallocalPlayback();
             vocallocalGroupActive = periodQueueKey;
 
-            const played = await playVocallocalForSlide(slide.htmlID, periodQueueKey);
+            const played = await ctl.guard(playVocallocalForSlide(slide.htmlID, periodQueueKey));
             if (localToken !== shortTermSequenceToken) return;
 
             if (!played) {
                 const fallbackMs = slide.shortTermFallbackPeriodMs ?? Math.max(2500, Math.floor(14000 / count));
-                await new Promise(resolve => setTimeout(resolve, fallbackMs));
+                await ctl.wait(fallbackMs);
                 if (localToken !== shortTermSequenceToken) return;
             }
 
@@ -923,7 +924,7 @@ async function runSlideSet(locationName, selectedPlaylist, locType, call) {
         slideInfoName.style.animation = 'fadeModule 0.5s ease-in-out forwards';
         slideInfoIcon.style.animation = 'slideDown 160ms ease-in-out forwards';
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await ctl.wait(500);
         if (localToken !== shortTermSequenceToken) return;
 
         slideInfoName.style.display = 'none';
@@ -1132,11 +1133,29 @@ function cancelSlideshow() {
     }, 650);
 }
 
+ctl.define({
+    roots: () => [document.querySelector('.slides-block')],
+    start: runPresentation,
+});
+ctl.onPause(() => {
+    vocallocalContext?.suspend();
+    for (const audio of vocallocalAudioElements) audio.pause();
+});
+ctl.onResume(() => {
+    vocallocalContext?.resume();
+    for (const audio of vocallocalAudioElements) audio.play().catch(() => {});
+});
+ctl.onStop(() => {
+    stopVocallocalPlayback();
+    vocallocalGroupActive = '';
+    stopShortTermProduct();
+});
+
 window.addEventListener('load', () => {
-    if (config.presentationConfig.autorunOnStartup === true) {
-        setTimeout(() => {
-            runPresentation();
-        }, 0);
+    if (config.presentationConfig.autorunOnStartup === true && config.presentationConfig.main === true) {
+        ctl.start();
+    } else if (config.presentationConfig.main !== true) {
+        console.log(logTheFrickinTime + "Main presentation mode is disabled.");
     }
 });
 
@@ -1154,8 +1173,8 @@ function runMainCurrentSlide() {
     currentModule2.style.display = 'none';
     currentExtraProducts.forEach(el => el.style.display = 'none');
 
-    setTimeout(() => {
-        requestAnimationFrame(() => {
+    ctl.after(() => {
+        ctl.frame(() => {
             currentExtraProducts.forEach((el, i) => {
                 el.style.animation = `mainPresentationSlideIn ${500 + i * 100}ms ease-in-out`;
                 el.style.display = 'flex';
@@ -1165,13 +1184,13 @@ function runMainCurrentSlide() {
 
 
 
-    setTimeout(() => {
-        requestAnimationFrame(() => {
+    ctl.after(() => {
+        ctl.frame(() => {
             currentModule1.style.animation = 'fadeModule 0.4s ease-out 1';
         });
 
-        setTimeout(() => {
-            requestAnimationFrame(() => {
+        ctl.after(() => {
+            ctl.frame(() => {
                 currentModule1.style.display = 'none';
                 currentModule1.style.animation = '';
                 currentModule2.style.display = 'block';
@@ -1182,14 +1201,14 @@ function runMainCurrentSlide() {
 }
 
 function runExtendedSlide() {
-    requestAnimationFrame(() => {
+    ctl.frame(() => {
         domCache.forecastDays.forEach((day, i) => {
             if (day) day.style.animation = `switchModules ${0.6 + i * 0.1}s ease-in-out`;
         });
     });
 
-    setTimeout(() => {
-        requestAnimationFrame(() => {
+    ctl.after(() => {
+        ctl.frame(() => {
             domCache.forecastDays.forEach(day => {
                 if (day) day.style.animation = '';
             });
@@ -1198,8 +1217,8 @@ function runExtendedSlide() {
 }
 
 function runBumperSlide(bumperId, upcomingRegions, callback) {
-    clearTimeout(slideNearEnd);
-    clearTimeout(slideEnd);
+    ctl.cancel(slideNearEnd);
+    ctl.cancel(slideEnd);
 
     const def = bumperDefs[bumperId];
     if (!def) { callback?.(); return; }
@@ -1257,7 +1276,7 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
             if (domCache.bumperBgAuthor) domCache.bumperBgAuthor.innerText = selectedBG.author || '';
         }
 
-        requestAnimationFrame(() => {
+        ctl.frame(() => {
             domCache.regionalBumperHeader.style.animation = 'mainPresentationSlideIn 500ms ease-in-out forwards';
             domCache.regionalLocationHeader.style.animation = 'switchModules 300ms ease-in-out forwards';
             domCache.upNextRegionalText.style.animation = 'fadeInTypeBeat 1900ms ease-in-out forwards';
@@ -1267,8 +1286,8 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
             domCache.upNextRegionalText4.style.animation = 'fadeInTypeBeat 3200ms ease-in-out forwards';
             domCache.regionalBumperSubtext.style.animation = 'fadeInTypeBeat 1500ms linear forwards';
         });
-        setTimeout(() => {
-            requestAnimationFrame(() => {
+        ctl.after(() => {
+            ctl.frame(() => {
                 domCache.regionalBumperHeader.style.animation = 'fadeModule 300ms ease forwards';
                 domCache.regionalLocationHeader.style.animation = 'fadeModule 400ms ease forwards';
                 domCache.upNextRegionalText.style.animation = 'fadeModule 500ms ease forwards';
@@ -1279,17 +1298,17 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
                 domCache.regionalBumperSubtext.style.animation = 'fadeModule 1500ms linear forwards';
             });
         }, def.duration - 1000);
-        setTimeout(() => stopMarquee(domCache.regionalBumperSubtext), def.duration);
+        ctl.after(() => stopMarquee(domCache.regionalBumperSubtext), def.duration);
     }
 
-    slideNearEnd = setTimeout(() => {
+    slideNearEnd = ctl.after(() => {
         if (el) el.style.animation = playlistSettings.defaultAnimationOut;
         def.onEnd?.();
         slideInfoName.style.animation = 'fadeModule 0.5s ease-in-out forwards';
         slideInfoIcon.style.animation = 'slideDown 160ms ease-in-out forwards';
     }, def.duration - BUMPER_OUT_MS);
 
-    slideEnd = setTimeout(() => {
+    slideEnd = ctl.after(() => {
         slideInfoName.style.display = 'none';
         slideInfoName.style.animation = '';
         slideProgressBar.style.display = 'none';
@@ -1302,19 +1321,16 @@ function runBumperSlide(bumperId, upcomingRegions, callback) {
 
 function runRadarSlide() {
     const radarEl = domCache.radarDiv;
-    requestAnimationFrame(() => {
+    ctl.frame(() => {
         radarEl.style.display = 'block';
     });
     const onAnimEnd = () => {
         radarEl.removeEventListener('animationend', onAnimEnd);
-        requestAnimationFrame(() => resizeRadar());
+        ctl.frame(() => resizeRadar());
     };
     radarEl.addEventListener('animationend', onAnimEnd);
-    setTimeout(() => {
+    ctl.after(() => {
         radarEl.removeEventListener('animationend', onAnimEnd);
         resizeRadar();
     }, 700);
-    setTimeout(() => {
-        requestAnimationFrame(() => {});
-    }, slideDurationMS + 100);
 }

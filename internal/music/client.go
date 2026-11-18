@@ -1,31 +1,34 @@
 package music
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v4"
 	"github.com/pion/webrtc/v4/pkg/media"
 )
 
 const (
-	writeWait         = 10 * time.Second
-	pongWait          = 60 * time.Second
-	pingPeriod        = 45 * time.Second
 	iceGrace          = 5 * time.Second
 	sampleQueueLength = 24
 	sampleQueueTarget = 4
 )
 
-type client struct {
+// Sender delivers one music message to a page over its event channel: "state", "track", "answer", "ice"
+// or "error", with a JSON-encodable payload. It must not block.
+type Sender func(command string, payload any)
+
+// Session is one page's music: its WebRTC audio peer, signalled over the page's event channel.
+// The page sends "offer" and "ice"; the server answers with "answer" and "ice", and pushes "state"
+// and "track" as playback changes.
+type Session struct {
 	service *Service
-	conn    *websocket.Conn
-	send    chan []byte
+	send    Sender
 	samples chan media.Sample
 
 	mu    sync.RWMutex
@@ -34,70 +37,20 @@ type client struct {
 	once  sync.Once
 }
 
-type wsMessage struct {
-	Type      string                     `json:"type"`
-	SDP       *webrtc.SessionDescription `json:"sdp,omitempty"`
-	Candidate *webrtc.ICECandidateInit   `json:"candidate,omitempty"`
+// Attach starts a page's music session and sends it the current state.
+func (s *Service) Attach(send Sender) *Session {
+	c := &Session{service: s, send: send, samples: make(chan media.Sample, sampleQueueLength)}
+	s.register(c)
+	go c.samplePump()
+	return c
 }
 
-func newClient(service *Service, conn *websocket.Conn) *client {
-	return &client{
-		service: service,
-		conn:    conn,
-		send:    make(chan []byte, 16),
-		samples: make(chan media.Sample, sampleQueueLength),
-	}
+// Close ends the session when its page goes.
+func (c *Session) Close() {
+	c.service.unregister(c)
 }
 
-func (c *client) readPump() {
-	defer c.service.unregister(c)
-	c.conn.SetReadLimit(maxWSMessageBytes)
-	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error {
-		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
-	})
-	for {
-		_, payload, err := c.conn.ReadMessage()
-		if err != nil {
-			return
-		}
-		var msg wsMessage
-		if err := jsonUnmarshal(payload, &msg); err != nil {
-			c.sendJSON(newErrorMessage("invalid message"))
-			continue
-		}
-		c.handleMessage(msg)
-	}
-}
-
-func (c *client) writePump() {
-	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-		_ = c.conn.Close()
-	}()
-	for {
-		select {
-		case payload, ok := <-c.send:
-			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if !ok {
-				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-			if err := c.conn.WriteMessage(websocket.TextMessage, payload); err != nil {
-				return
-			}
-		case <-ticker.C:
-			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
-	}
-}
-
-func (c *client) samplePump() {
+func (c *Session) samplePump() {
 	for sample := range c.samples {
 		c.mu.RLock()
 		track := c.track
@@ -112,34 +65,47 @@ func (c *client) samplePump() {
 	}
 }
 
-func (c *client) handleMessage(msg wsMessage) {
-	switch msg.Type {
-	case "hello":
-		c.sendJSON(map[string]any{"type": "state", "state": c.service.State()})
-	case "webrtc.offer":
-		if msg.SDP == nil {
-			c.sendJSON(newErrorMessage("missing offer"))
+// Handle takes one music message from the page.
+func (c *Session) Handle(command string, args json.RawMessage) {
+	var payload struct {
+		SDP       *webrtc.SessionDescription `json:"sdp"`
+		Candidate *webrtc.ICECandidateInit   `json:"candidate"`
+	}
+	if len(args) > 0 {
+		if err := json.Unmarshal(args, &payload); err != nil {
+			c.sendError("malformed music message")
 			return
 		}
-		if err := c.handleOffer(*msg.SDP); err != nil {
-			c.sendJSON(newErrorMessage(err.Error()))
+	}
+	switch command {
+	case "offer":
+		if payload.SDP == nil {
+			c.sendError("missing offer")
+			return
 		}
-	case "webrtc.ice":
-		if msg.Candidate == nil {
+		if err := c.handleOffer(*payload.SDP); err != nil {
+			c.sendError(err.Error())
+		}
+	case "ice":
+		if payload.Candidate == nil {
 			return
 		}
 		c.mu.RLock()
 		pc := c.pc
 		c.mu.RUnlock()
 		if pc != nil {
-			_ = pc.AddICECandidate(*msg.Candidate)
+			_ = pc.AddICECandidate(*payload.Candidate)
 		}
 	default:
-		c.sendJSON(newErrorMessage("unsupported message type"))
+		c.sendError("unsupported music command " + command)
 	}
 }
 
-func (c *client) handleOffer(offer webrtc.SessionDescription) error {
+func (c *Session) sendError(message string) {
+	c.send("error", map[string]string{"message": message})
+}
+
+func (c *Session) handleOffer(offer webrtc.SessionDescription) error {
 	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		return err
@@ -175,7 +141,7 @@ func (c *client) handleOffer(offer webrtc.SessionDescription) error {
 		if candidate == nil {
 			return
 		}
-		c.sendJSON(map[string]any{"type": "webrtc.ice", "candidate": candidate.ToJSON()})
+		c.send("ice", map[string]any{"candidate": candidate.ToJSON()})
 	})
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		c.service.logf("webrtc connection state: %s", state.String())
@@ -216,7 +182,7 @@ func (c *client) handleOffer(offer webrtc.SessionDescription) error {
 	c.pc = pc
 	c.track = track
 	c.mu.Unlock()
-	c.sendJSON(map[string]any{"type": "webrtc.answer", "sdp": pc.LocalDescription()})
+	c.send("answer", map[string]any{"sdp": pc.LocalDescription()})
 	return nil
 }
 
@@ -283,7 +249,7 @@ func forceStereoParameters(parameters string) string {
 	return strings.Join(values, ";")
 }
 
-func (c *client) writeSample(sample media.Sample) {
+func (c *Session) writeSample(sample media.Sample) {
 	defer func() {
 		_ = recover()
 	}()
@@ -306,19 +272,7 @@ drain:
 	}
 }
 
-func (c *client) sendJSON(v any) {
-	payload := jsonMarshal(v)
-	defer func() {
-		_ = recover()
-	}()
-	select {
-	case c.send <- payload:
-	default:
-		c.close()
-	}
-}
-
-func (c *client) closePeer() {
+func (c *Session) closePeer() {
 	c.mu.Lock()
 	pc := c.pc
 	c.pc = nil
@@ -329,7 +283,7 @@ func (c *client) closePeer() {
 	}
 }
 
-func (c *client) closePeerIfCurrent(pc *webrtc.PeerConnection) {
+func (c *Session) closePeerIfCurrent(pc *webrtc.PeerConnection) {
 	c.mu.Lock()
 	if c.pc != pc {
 		c.mu.Unlock()
@@ -341,11 +295,9 @@ func (c *client) closePeerIfCurrent(pc *webrtc.PeerConnection) {
 	_ = pc.Close()
 }
 
-func (c *client) close() {
+func (c *Session) close() {
 	c.once.Do(func() {
 		c.closePeer()
-		close(c.send)
 		close(c.samples)
-		_ = c.conn.Close()
 	})
 }

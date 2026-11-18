@@ -2,6 +2,7 @@ import { config } from "../config.js";
 import { fetchOnlineBackground } from "./data.js";
 import "./glass_cache.js";
 import { sidebarEnabled } from "./layout.js";
+import { onHealth } from "./health.js";
 
 const performanceConfig = config.performance ?? {};
 const liveBlurParam = new URLSearchParams(window.location.search).get('liveBlur');
@@ -39,7 +40,6 @@ const date = domElements.date;
 const time = domElements.time;
 
 let broadcastState = 0; // zero is good weather, one is bad weather.
-let localBackgroundObjectUrl = null;
 
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -74,59 +74,26 @@ function initBackgrounds() {
             onlineBg();
         } 
         if (config.backgroundSource === "local") {
-            async function initLocalBackground() {
-                const weatherType = broadcastState === 0 ? "wxgood" : "wxbad";
-                const post = await fetch('/backgrounds/init', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'text/plain'
-                    },
-                    body: `[${weatherType}]`
-                });
-                const result = await post.text();
-                console.log(logTheFrickinTime, result);
-            }
-
-            async function fetchLocalBackground() {
-                const response = await fetch('/backgrounds/image');
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type') || '';
-
-                    if (contentType.startsWith('image/')) {
-                        const imageBlob = await response.blob();
-                        const objectUrl = URL.createObjectURL(imageBlob);
-
-                        if (localBackgroundObjectUrl) {
-                            URL.revokeObjectURL(localBackgroundObjectUrl);
-                        }
-
-                        localBackgroundObjectUrl = objectUrl;
-                        wallpaper.style.backgroundImage = `url(${objectUrl})`;
-                        console.log(logTheFrickinTime, "Applied streamed local background image", contentType);
-                    } else {
-                        const imageUrl = await response.text();
-                        wallpaper.style.backgroundImage = `url(${imageUrl})`;
-                        console.log(logTheFrickinTime, "Applied legacy local background image URL:", imageUrl);
-                    }
-                } else {
-                    console.warn(logTheFrickinTime, "Failed to fetch background image");
-                }
-            }
-            
-            initLocalBackground();
-
-            setTimeout(() => {
-                fetchLocalBackground();
-            }, 1000);
-            
-            setInterval(() => {
-                initLocalBackground();
-                setTimeout(() => {
-                    fetchLocalBackground();
-                }, 500);
-            }, 8 * 36000000);
+            // Tells the server the weather, which picks the backgrounds it rotates through. The on-air image
+            // then arrives as health backgroundSync, the same on every feed.
+            const weatherType = broadcastState === 0 ? "wxgood" : "wxbad";
+            fetch('/backgrounds/init', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: `[${weatherType}]` })
+                .then(response => response.text())
+                .then(result => console.log(logTheFrickinTime, result));
         }
 }
+
+// The server's on-air local background: shown once the new image has loaded, or faded out when hidden.
+onHealth("backgroundSync", async ({ image, hidden }) => {
+    if (config.backgroundSource !== "local" || config.presentationConfig.backgrounds !== true) return;
+    wallpaper.classList.toggle("wallpaper-hidden", hidden);
+    if (hidden || !image) return;
+    const preload = new Image();
+    preload.src = image;
+    await preload.decode();
+    wallpaper.style.backgroundImage = `url("${image}")`;
+    console.log(logTheFrickinTime, "On-air background:", image);
+});
 
 const VIDEO_MODES = Object.freeze({
     vga:       { width: 1920, height: 1440, barWidth: "100%" },  // 4:3 - VGA
@@ -262,13 +229,6 @@ window.onload = () => {
     presentationType();
     initBackgrounds();
 };
-
-window.addEventListener('beforeunload', () => {
-    if (localBackgroundObjectUrl) {
-        URL.revokeObjectURL(localBackgroundObjectUrl);
-        localBackgroundObjectUrl = null;
-    }
-});
 
 const refreshInterval = config.refreshInterval * 60000;
 if (refreshInterval > 0) {

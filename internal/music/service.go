@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/pion/webrtc/v4/pkg/media/oggreader"
 )
@@ -26,7 +25,6 @@ import (
 const (
 	opusClockRate     = 48000
 	defaultPagePeriod = 20 * time.Millisecond
-	maxWSMessageBytes = 64 * 1024
 	oggNoGranule      = ^uint64(0)
 	maxPlaybackLag    = 120 * time.Millisecond
 )
@@ -66,7 +64,7 @@ type Service struct {
 	startedAt   time.Time
 	state       string
 	stateDetail string
-	clients     map[*client]struct{}
+	clients     map[*Session]struct{}
 
 	normalizer *normalizer // nil unless WithLoudness is set and ffmpeg is available
 
@@ -87,7 +85,7 @@ func NewService(musicDir string, log Logger, opts ...Option) (*Service, error) {
 		log:      log,
 		rng:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec // playlist shuffle only
 		state:    "EMPTY",
-		clients:  make(map[*client]struct{}),
+		clients:  make(map[*Session]struct{}),
 		ctx:      ctx,
 		cancel:   cancel,
 	}
@@ -108,7 +106,7 @@ func (s *Service) Start(parent context.Context) {
 func (s *Service) Close() {
 	s.cancel()
 	s.mu.Lock()
-	clients := make([]*client, 0, len(s.clients))
+	clients := make([]*Session, 0, len(s.clients))
 	for c := range s.clients {
 		clients = append(clients, c)
 	}
@@ -116,25 +114,6 @@ func (s *Service) Close() {
 	for _, c := range clients {
 		c.close()
 	}
-}
-
-func (s *Service) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	s.logf("websocket connect from %s", r.RemoteAddr)
-	upgrader := websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin:     sameOrigin,
-	}
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		s.log("websocket upgrade failed: %v", err)
-		return
-	}
-	c := newClient(s, conn)
-	s.register(c)
-	go c.writePump()
-	go c.samplePump()
-	c.readPump()
 }
 
 func (s *Service) HandleArt(w http.ResponseWriter, r *http.Request, trackID string) {
@@ -176,15 +155,15 @@ func (s *Service) stateLocked() State {
 	return State{State: s.state, Track: current, Elapsed: elapsed, Message: s.stateDetail}
 }
 
-func (s *Service) register(c *client) {
+func (s *Service) register(c *Session) {
 	s.mu.Lock()
 	s.clients[c] = struct{}{}
 	state := s.stateLocked()
 	s.mu.Unlock()
-	c.sendJSON(map[string]any{"type": "state", "state": state})
+	c.send("state", state)
 }
 
-func (s *Service) unregister(c *client) {
+func (s *Service) unregister(c *Session) {
 	s.mu.Lock()
 	delete(s.clients, c)
 	s.mu.Unlock()
@@ -311,7 +290,7 @@ func (s *Service) playOggOpusReader(track Track, reader io.Reader) error {
 	clients := s.clientSnapshotLocked()
 	s.mu.Unlock()
 	s.logf("now playing: %s", track.path)
-	broadcastState(clients, "track_change", state)
+	broadcastState(clients, "track", state)
 
 	var lastGranule uint64
 	var pending []byte
@@ -382,8 +361,8 @@ func (s *Service) playOggOpusReader(track Track, reader io.Reader) error {
 	}
 }
 
-func (s *Service) clientSnapshotLocked() []*client {
-	clients := make([]*client, 0, len(s.clients))
+func (s *Service) clientSnapshotLocked() []*Session {
+	clients := make([]*Session, 0, len(s.clients))
 	for c := range s.clients {
 		clients = append(clients, c)
 	}
@@ -482,7 +461,16 @@ func readOggPackets(r io.Reader, pending *[]byte) ([][]byte, uint64, error) {
 	return packets, granule, nil
 }
 
+// probeTrack reads a track's tags, duration and cover art: Ogg Opus directly, everything else through
+// ffprobe (probe_media.go).
 func probeTrack(root string, path string) (Track, error) {
+	if !isOggOpusExtension(filepath.Ext(path)) {
+		return probeMedia(root, path)
+	}
+	return probeOggTrack(root, path)
+}
+
+func probeOggTrack(root string, path string) (Track, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return Track{}, err
@@ -655,9 +643,10 @@ func sleepContext(ctx context.Context, d time.Duration) bool {
 	}
 }
 
-func broadcastState(clients []*client, messageType string, state State) {
+// broadcastState sends "state" (a full resync) or "track" (a new track starting) to every session.
+func broadcastState(clients []*Session, command string, state State) {
 	for _, c := range clients {
-		c.sendJSON(map[string]any{"type": messageType, "state": state})
+		c.send(command, state)
 	}
 }
 
@@ -665,32 +654,4 @@ func (s *Service) logf(format string, args ...any) {
 	if s.log != nil {
 		s.log(format, args...)
 	}
-}
-
-func sameOrigin(r *http.Request) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	host := r.Host
-	return origin == "http://"+host || origin == "https://"+host
-}
-
-func newErrorMessage(message string) map[string]any {
-	return map[string]any{"type": "error", "message": message}
-}
-
-func jsonMarshal(v any) []byte {
-	payload, err := json.Marshal(v)
-	if err != nil {
-		return []byte(`{"type":"error","message":"json encode failed"}`)
-	}
-	return payload
-}
-
-func jsonUnmarshal(data []byte, v any) error {
-	if len(data) > maxWSMessageBytes {
-		return fmt.Errorf("message too large")
-	}
-	return json.Unmarshal(data, v)
 }

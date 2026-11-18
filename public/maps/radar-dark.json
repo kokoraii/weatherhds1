@@ -112,31 +112,6 @@
       "paint": { "line-color": "#ffffff", "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.5, 12, 2] }
     },
     {
-      "id": "road-shield", "type": "symbol", "source": "openmaptiles", "source-layer": "transportation_name", "minzoom": 6,
-      "filter": ["all",
-        ["has", "ref"], ["<=", ["get", "ref_length"], 6],
-        ["match", ["get", "class"], ["motorway", "trunk", "primary"], true, false]
-      ],
-      "layout": {
-        "symbol-placement": "line",
-        "symbol-spacing": 400,
-        "icon-image": ["match", ["get", "network"],
-          "us-interstate", ["concat", "us-interstate_", ["to-string", ["min", ["get", "ref_length"], 3]]],
-          "us-highway", ["concat", "us-highway_", ["to-string", ["min", ["get", "ref_length"], 3]]],
-          "us-state", ["concat", "us-state_", ["to-string", ["get", "ref_length"]]],
-          ["concat", "road_", ["to-string", ["get", "ref_length"]]]
-        ],
-        "icon-rotation-alignment": "viewport",
-        "icon-size": 1,
-        "text-field": ["get", "ref"],
-        "text-font": ["Poppins Bold"],
-        "text-size": 14,
-        "text-rotation-alignment": "viewport",
-        "text-letter-spacing": 0.05
-      },
-      "paint": { "text-color": "hsl(230, 55%, 13%)" }
-    },
-    {
       "id": "settlement-minor-label", "type": "symbol", "source": "openmaptiles", "source-layer": "place", "minzoom": 5, "maxzoom": 13,
       "filter": ["step", ["zoom"],
         ["==", ["get", "class"], "town"],

@@ -4,6 +4,11 @@ import { formatTime } from './weather.js';
 import { startMarquee } from './marquee.js'
 import { weatherIconUrl } from './icons.js'
 import { scrollOverflowByLine } from './autoscroll.js'
+import { presentations } from './presentation.js'
+
+// The LDL presentation: each LDL location's slides in turn. Its timing runs through its controller
+// (presentation.js) so the server can pause, stop or rebuild it.
+const ctl = presentations.ldl
 
 const ldlPresentationSlides = {
     "0": { htmlID: "ldl-current",        durationMS: 15000, label: 'Now' },
@@ -170,7 +175,7 @@ function staggerIn(els, step = 60, start = 0) {
         el.style.transition = 'none'
         el.style.opacity = '0'
         el.style.transform = 'translateY(16px)'
-        setTimeout(() => {
+        ctl.after(() => {
             el.style.transition = 'opacity 0.35s ease, transform 0.35s ease'
             el.style.opacity = '1'
             el.style.transform = 'translateY(0)'
@@ -183,7 +188,7 @@ function staggerInX(els, step = 55) {
         el.style.transition = 'none'
         el.style.opacity = '0'
         el.style.transform = 'translateX(-20px) scale(0.97)'
-        setTimeout(() => {
+        ctl.after(() => {
             el.style.transition = 'opacity 0.28s ease, transform 0.28s ease'
             el.style.opacity = '1'
             el.style.transform = 'translateX(0) scale(1)'
@@ -495,7 +500,7 @@ function scrollShorttermNarrative(durationMs) {
 
 function runShorttermPager() {
     if (shorttermPagerTimeout) {
-        clearTimeout(shorttermPagerTimeout)
+        ctl.cancel(shorttermPagerTimeout)
         shorttermPagerTimeout = null
     }
 
@@ -519,7 +524,7 @@ function runShorttermPager() {
         container.style.opacity = '0'
         container.style.transform = 'translateX(-24px)'
 
-        setTimeout(() => {
+        ctl.after(() => {
             renderShorttermPeriod(shorttermPeriods[index])
             scrollShorttermNarrative(perPeriod - 200)
             container.style.transform = 'translateX(24px)'
@@ -531,11 +536,11 @@ function runShorttermPager() {
         }, 200)
 
         if (index < shorttermPeriods.length - 1) {
-            shorttermPagerTimeout = setTimeout(page, perPeriod)
+            shorttermPagerTimeout = ctl.after(page, perPeriod)
         }
     }
 
-    shorttermPagerTimeout = setTimeout(page, perPeriod)
+    shorttermPagerTimeout = ctl.after(page, perPeriod)
 }
 
 function appendLDLDaily() {
@@ -872,7 +877,7 @@ function hideLocationLabel() {
     if (!label) return;
     label.style.animation = 'slideOut 1s ease-out';
 
-    setTimeout(() => {
+    ctl.after(() => {
         label.style.display = 'none';
     }, 300);
 }
@@ -884,7 +889,7 @@ function triggerExitAnimation(slideID) {
 
     slideElement.style.animation = 'slideOut 1s ease-out';
 
-    setTimeout(() => {
+    ctl.after(() => {
         slideElement.style.display = 'none';
     }, 200);
 }
@@ -925,6 +930,11 @@ function startWindJiggle(arrow, ticksOuter, ticksInner, baseAngle) {
 
     const tick = (now) => {
         if (!ldlDomCache.ldlCurrent || ldlDomCache.ldlCurrent.style.display === 'none') return
+        if (ctl.paused) {
+            startTime = null
+            rafId = requestAnimationFrame(tick)
+            return
+        }
 
         if (!startTime) startTime = now
         const elapsed = now - startTime
@@ -993,7 +1003,7 @@ function appendCarouselPill(track, name, locationIndex, fadeIn) {
     el.textContent = formatLDLCarouselLocationName(name)
     if (fadeIn) {
         el.style.opacity = '0'
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        ctl.frame(() => ctl.frame(() => {
             el.style.transition = 'opacity 0.35s ease'
             el.style.opacity = '1'
         }))
@@ -1028,7 +1038,7 @@ function scrollCarouselToLocation(index) {
 
     setCarouselActiveLocation(index)
 
-    setTimeout(() => {
+    ctl.after(() => {
         pills[0].remove()
 
         const nextName = locations[carouselTailIndex]
@@ -1055,7 +1065,7 @@ function updateCarousel(slide) {
     if (!badge) return
     badge.style.transition = 'opacity 0.18s ease'
     badge.style.opacity = '0'
-    setTimeout(() => {
+    ctl.after(() => {
         badge.textContent = slide.label ?? ''
         badge.style.opacity = '1'
     }, 180)
@@ -1086,7 +1096,7 @@ const slideAnimations = {
 
         const WIND_DUR = '2.4s'
         const WIND_EASE = 'cubic-bezier(0.34, 1.20, 0.64, 1)'
-        setTimeout(() => {
+        ctl.after(() => {
             arrow.style.transition = `transform ${WIND_DUR} ${WIND_EASE}`
             arrow.style.transform = `translate(-50%, -50%) rotate(${lastWindAngle}deg) translateY(var(--ldl-wind-arrow-radius))`
             if (ticksOuter) {
@@ -1099,7 +1109,7 @@ const slideAnimations = {
             }
         }, 16)
 
-        setTimeout(() => {
+        ctl.after(() => {
             startWindJiggle(arrow, ticksOuter, ticksInner, lastWindAngle)
         }, 2500)
     },
@@ -1118,7 +1128,7 @@ const slideAnimations = {
         if (!el) return
         el.style.transition = 'none'
         el.style.opacity = '0'
-        setTimeout(() => {
+        ctl.after(() => {
             el.style.transition = 'opacity 0.4s ease'
             el.style.opacity = '1'
         }, 150)
@@ -1134,7 +1144,7 @@ const slideAnimations = {
         el.style.transition = 'none'
         el.style.opacity = '0'
         el.style.transform = 'translateY(8px)'
-        setTimeout(() => {
+        ctl.after(() => {
             el.style.transition = 'opacity 0.5s ease, transform 0.5s ease'
             el.style.opacity = '1'
             el.style.transform = 'translateY(0)'
@@ -1153,7 +1163,7 @@ function showLDLSlide() {
     const slideElement = slideElementMap[slide.htmlID]?.() || document.getElementById(slide.htmlID)
     if (!slideElement) {
         console.warn(`${logTheFrickinTime()} LDL slide element not found: ${slide.htmlID}`)
-        setTimeout(nextLDLSlide, 2000)
+        ctl.after(nextLDLSlide, 2000)
         return
     }
 
@@ -1166,14 +1176,14 @@ function showLDLSlide() {
     }
 
     if (ldlSlideIndex === Object.keys(ldlPresentationSlides).length - 1) {
-        setTimeout(() => hideLocationLabel(), duration - 1000)
+        ctl.after(() => hideLocationLabel(), duration - 1000)
     }
 
-    setTimeout(() => triggerExitAnimation(slide.htmlID), duration - 1000)
+    ctl.after(() => triggerExitAnimation(slide.htmlID), duration - 1000)
 
-    setTimeout(() => {
+    ctl.after(() => {
         if (slide.htmlID === 'ldl-shortterm') {
-            clearTimeout(shorttermPagerTimeout)
+            ctl.cancel(shorttermPagerTimeout)
             shorttermPagerTimeout = null
             stopShorttermNarrativeScroll()
         }
@@ -1200,6 +1210,7 @@ async function nextLDLLocation() {
     }
 
     ldlLocationIndex = (ldlLocationIndex + 1) % ldlLocations.length;
+    if (ldlLocationIndex === 0 && !ctl.boundary()) return; // asked to end after this cycle
 
     scrollCarouselToLocation(ldlLocationIndex)
     showLocationLabel();
@@ -1207,7 +1218,7 @@ async function nextLDLLocation() {
 
     ldlSlideIndex = 0;
 
-    await LDLData();
+    await ctl.guard(LDLData());
     showLDLSlide();
 }
 
@@ -1218,25 +1229,25 @@ function runProgressBar() {
     if (!progressBar) return;
 
     if (progressBarTimeout) {
-        clearTimeout(progressBarTimeout);
+        ctl.cancel(progressBarTimeout);
         progressBarTimeout = null;
     }
 
     progressBar.style.animation = 'none';
     progressBar.style.transform = 'scaleX(0)';
     progressBar.style.display = 'block';
-    requestAnimationFrame(() => {
+    ctl.frame(() => {
         progressBar.style.animation = `ldlProgressBar ${totalDurationSec}s linear`;
     });
 
-    progressBarTimeout = setTimeout(() => {
+    progressBarTimeout = ctl.after(() => {
         progressBar.style.display = 'none';
         progressBar.style.animation = 'none';
         progressBarTimeout = null;
     }, totalDuration);
 }
 
-export async function runInitialLDL() {
+async function runInitialLDL() {
     const ldlLocations = locationConfig.ldlLocations;
     
     if (!ldlLocations || ldlLocations.length === 0) {
@@ -1257,6 +1268,15 @@ export async function runInitialLDL() {
     initCarousel()
     showLocationLabel()
     runProgressBar()
-    await LDLData()
+    await ctl.guard(LDLData())
     showLDLSlide()
 }
+
+ctl.define({
+    roots: () => [document.querySelector('.ldl-container')],
+    start: runInitialLDL,
+})
+ctl.onStop(() => {
+    stopWindJiggle()
+    stopShorttermNarrativeScroll()
+})

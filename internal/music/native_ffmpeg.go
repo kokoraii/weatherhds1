@@ -436,7 +436,7 @@ func (s *Service) playNativeTrack(track Track) error {
 	clients := s.clientSnapshotLocked()
 	s.mu.Unlock()
 	s.logf("now playing with native ffmpeg: %s", track.path)
-	broadcastState(clients, "track_change", state)
+	broadcastState(clients, "track", state)
 
 	nextSendAt := time.Now()
 	for {
