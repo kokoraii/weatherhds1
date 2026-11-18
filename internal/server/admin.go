@@ -9,9 +9,6 @@ import (
 	"weatherhds/internal/control"
 )
 
-// maxStagedFile caps one upload to the change set: videos are the large ones.
-const maxStagedFile = 4 << 30
-
 // newAdminHandler serves the admin panel and the command API. The API only answers this machine:
 // remote control goes through the SSH console, which authenticates.
 //
@@ -43,7 +40,7 @@ func newAdminHandler(adminWebroot string, dispatcher *control.Dispatcher, stage 
 		writeJSON(w, http.StatusOK, dispatcher.Hub().Pages())
 	}))
 	mux.HandleFunc("PUT /api/changeset/files/{target...}", localOnly(func(w http.ResponseWriter, r *http.Request) {
-		file, err := stage.StageFile(http.MaxBytesReader(w, r.Body, maxStagedFile), r.PathValue("target"), "admin API ("+r.RemoteAddr+")")
+		file, err := stage.StageFile(http.MaxBytesReader(w, r.Body, changeset.MaxFileBytes), r.PathValue("target"), "admin API ("+r.RemoteAddr+")")
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return

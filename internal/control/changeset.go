@@ -8,7 +8,7 @@ func init() {
 	register(
 		Spec{
 			Type: "changeSet", Command: "stageFile", Local: true,
-			Help:   "Stage a file on this machine to go live at as=public/…, Music/… or Videos/….",
+			Help:   "Stage a file on this machine, or download a URL, to go live at as=public/…, Music/… or Videos/….",
 			Target: &Param{Name: "source", Required: true},
 			Params: []Param{{Name: "as", Required: true, Help: "where it goes, relative to the server's folder"}},
 		},

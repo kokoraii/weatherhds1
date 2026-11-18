@@ -11,11 +11,23 @@ import (
 	"weatherhds/internal/control"
 )
 
+// downloadTimeout bounds staging a file from a URL.
+const downloadTimeout = 30 * time.Minute
+
 // handleChangeSets carries out the changeSet commands. Provisioning tells the pages
 // (changeSet provisioned) what each presentation should do, with the files that changed.
 func handleChangeSets(dispatcher *control.Dispatcher, stage *changeset.Stage, backgrounds *BackgroundManager) {
 	dispatcher.Handle("changeSet", "stageFile", func(_ context.Context, r control.Request) (control.Outcome, error) {
-		file, err := stage.StagePath(r.Target, r.Args["as"], r.From)
+		var file changeset.File
+		var err error
+		if isURL(r.Target) {
+			// Its own deadline: a big video can take longer than the console waits for an answer.
+			ctx, cancel := context.WithTimeout(context.Background(), downloadTimeout)
+			defer cancel()
+			file, err = stage.StageURL(ctx, r.Target, r.Args["as"], r.From)
+		} else {
+			file, err = stage.StagePath(r.Target, r.Args["as"], r.From)
+		}
 		if err != nil {
 			return control.Outcome{}, err
 		}

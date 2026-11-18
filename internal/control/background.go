@@ -5,7 +5,7 @@ func init() {
 	register(
 		Spec{
 			Type: "background", Command: "setBackground", Local: true,
-			Help:   "Put one background on air on every page (auto: back to rotating).",
+			Help:   "Put one background (a file under public/, or an image URL, which is downloaded first) on air on every page; auto rotates again.",
 			Target: &Param{Name: "image", Required: true, Source: "backgrounds"},
 		},
 		Spec{

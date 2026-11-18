@@ -1,6 +1,9 @@
 package changeset
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,5 +99,38 @@ func TestDiscardEmptiesTheStage(t *testing.T) {
 	}
 	if manifest, _ := stage.List(); len(manifest.Files) != 0 {
 		t.Fatalf("still staged: %+v", manifest.Files)
+	}
+}
+
+func TestStageURLDownloadsIntoTheStage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/missing" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte("downloaded"))
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	stage := Open(workspace)
+	if _, err := stage.StageURL(context.Background(), server.URL+"/promo.mp4", "../escape.mp4", "test"); err == nil {
+		t.Fatal("a bad target should be refused before downloading")
+	}
+	if _, err := stage.StageURL(context.Background(), server.URL+"/missing", "Videos/x.mp4", "test"); err == nil {
+		t.Fatal("a 404 should be refused")
+	}
+	file, err := stage.StageURL(context.Background(), server.URL+"/promo.mp4", "Videos/promo.mp4", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.Size != int64(len("downloaded")) {
+		t.Fatalf("size %d", file.Size)
+	}
+	if _, err := stage.Provision(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(workspace, "Videos", "promo.mp4")); string(got) != "downloaded" {
+		t.Fatalf("provisioned %q", got)
 	}
 }

@@ -43,8 +43,8 @@ func newChannel(version string, logger *slog.Logger, musicService *music.Service
 	dispatcher := control.NewDispatcher(hub, func(format string, args ...any) {
 		logInfo(logger, "control", format, args...)
 	})
-	dispatcher.Handle("background", "setBackground", func(_ context.Context, r control.Request) (control.Outcome, error) {
-		if err := backgrounds.Pin(r.Target); err != nil {
+	dispatcher.Handle("background", "setBackground", func(ctx context.Context, r control.Request) (control.Outcome, error) {
+		if err := backgrounds.Pin(ctx, r.Target); err != nil {
 			return control.Outcome{}, err
 		}
 		if r.Target == "auto" {
@@ -56,8 +56,14 @@ func newChannel(version string, logger *slog.Logger, musicService *music.Service
 		backgrounds.Hide()
 		return control.Outcome{Message: "background hidden"}, nil
 	})
-	// playFile names a file in Videos/; the pages get its URL.
+	// playFile names a file in Videos/, whose URL the pages get, or a web address they play directly.
 	dispatcher.Handle("video", "playFile", func(ctx context.Context, r control.Request) (control.Outcome, error) {
+		if isURL(r.Target) {
+			if _, err := checkRemote(ctx, r.Target); err != nil {
+				return control.Outcome{}, err
+			}
+			return dispatcher.ToPages(ctx, r), nil
+		}
 		if _, err := videoFile(videosDir, r.Target); err != nil {
 			return control.Outcome{}, err
 		}

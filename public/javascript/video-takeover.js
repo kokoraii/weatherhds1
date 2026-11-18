@@ -2,10 +2,12 @@ import { on, report, unsupported } from "./events.js";
 import { presentations } from "./presentation.js";
 
 // Videos the server puts on screen (type video). playFile plays a file once and then hands back;
-// startStream shows a live stream until stopStream. Two ways to show one:
+// startStream shows a live stream until stopStream. Two ways to show one (args.mode):
+//   squeezeBack  (the default) the main slides shrink away and a frame at the video's shape grows in
+//                their place, while the LDL and sidebar carry on around it
 //   fullscreen   covers the whole picture
-//   squeezeBack  the main slides shrink away and a frame at the video's shape grows in their place,
-//                while the LDL and sidebar carry on around it
+// audio says what the music does meanwhile: mute (the default) fades it out, duck lowers it, ignore leaves
+// it playing as it is.
 // presControl says what each presentation does meanwhile: pause, stop or continue. Whatever a video
 // paused or stopped comes back when it ends; presentations it didn't touch are left alone.
 //
@@ -16,6 +18,7 @@ const DEFAULT_CONTROL = {
     fullscreen: { main: "pause", ldl: "pause", sidebar: "pause", cityticker: "pause" },
     squeezeBack: { main: "pause", ldl: "continue", sidebar: "continue", cityticker: "continue" },
 };
+const MUSIC_DUCK = { duck: {}, mute: { volume: 0 } }; // by audio; ignore leaves the music alone
 const TRANSITION_MS = 600; // .video-takeover fades and grows over this long (base.css)
 const START_TIMEOUT_MS = 20000;
 const FALLBACK_ASPECT = 16 / 9;
@@ -43,12 +46,13 @@ on("video", async message => {
 
 async function show(url, args, live) {
     if (current) await finish(current); // one at a time
-    const mode = args.mode ?? "fullscreen";
-    const takeover = { mode, held: new Map(), ...buildFrame(mode) };
+    const mode = args.mode ?? "squeezeBack";
+    const takeover = { mode, audio: args.audio ?? "mute", held: new Map(), ...buildFrame(mode) };
     current = takeover;
 
     control(takeover, { ...DEFAULT_CONTROL[mode], ...args });
-    document.dispatchEvent(new CustomEvent("music-duck-start"));
+    const duck = MUSIC_DUCK[takeover.audio];
+    if (duck) document.dispatchEvent(new CustomEvent("music-duck-start", { detail: duck }));
 
     takeover.player = videojs(takeover.video, {
         children: ["MediaLoader"], // just the picture: no controls, poster or spinner
@@ -168,7 +172,7 @@ async function finish(takeover) {
     takeover.player?.dispose();
     takeover.frame.remove();
     for (const name of [...takeover.held.keys()]) release(takeover, name);
-    if (!current) document.dispatchEvent(new CustomEvent("music-duck-end"));
+    if (!current && MUSIC_DUCK[takeover.audio]) document.dispatchEvent(new CustomEvent("music-duck-end"));
 }
 
 function type(url) {

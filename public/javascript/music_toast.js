@@ -383,12 +383,15 @@ function fadeVolume(to, durationMs) {
     volumeAnimation = requestAnimationFrame(step);
 }
 
-document.addEventListener("music-duck-start", () => {
-    if (duckingConfig.enabled === false) return;
-    fadeVolume(Number(duckingConfig.volume ?? 0.25), Number(duckingConfig.fadeMs ?? 350));
+// music-duck-start lowers the music to the configured ducking volume, or to detail.volume when the sender
+// asks for a level of its own (a video with audio=mute asks for 0, whatever the ducking config says).
+// music-duck-end brings it back up.
+document.addEventListener("music-duck-start", (event) => {
+    const volume = event.detail?.volume;
+    if (volume === undefined && duckingConfig.enabled === false) return;
+    fadeVolume(volume ?? Number(duckingConfig.volume ?? 0.25), Number(duckingConfig.fadeMs ?? 350));
 });
 
 document.addEventListener("music-duck-end", () => {
-    if (duckingConfig.enabled === false) return;
     fadeVolume(1, Number(duckingConfig.releaseMs ?? 700));
 });

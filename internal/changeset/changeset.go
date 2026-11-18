@@ -3,12 +3,14 @@
 package changeset
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,6 +19,9 @@ import (
 	"sync"
 	"time"
 )
+
+// MaxFileBytes caps one staged file, uploaded or downloaded: videos are the large ones.
+const MaxFileBytes = 4 << 30
 
 // Roots are the workspace folders a change set may write into.
 var Roots = []string{"public", "Music", "Videos"}
@@ -127,6 +132,45 @@ func (s *Stage) StagePath(source, target, by string) (File, error) {
 		return File{}, fmt.Errorf("%s is a folder; stage files one at a time", source)
 	}
 	return s.StageFile(in, target, by)
+}
+
+// StageURL downloads a file into the stage, for target.
+func (s *Stage) StageURL(ctx context.Context, source, target, by string) (File, error) {
+	if _, err := CleanTarget(target); err != nil {
+		return File{}, err // before downloading anything
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
+	if err != nil {
+		return File{}, err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return File{}, fmt.Errorf("download %s: %w", source, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return File{}, fmt.Errorf("download %s: %s", source, response.Status)
+	}
+	if response.ContentLength > MaxFileBytes {
+		return File{}, fmt.Errorf("%s is over %d GB", source, MaxFileBytes>>30)
+	}
+	body := &cappedReader{reader: response.Body, left: MaxFileBytes}
+	return s.StageFile(body, target, by)
+}
+
+// cappedReader fails once more than its limit has been read, so a download can't fill the disk.
+type cappedReader struct {
+	reader io.Reader
+	left   int64
+}
+
+func (c *cappedReader) Read(p []byte) (int, error) {
+	n, err := c.reader.Read(p)
+	c.left -= int64(n)
+	if c.left < 0 {
+		return n, fmt.Errorf("the download is over %d GB", MaxFileBytes>>30)
+	}
+	return n, err
 }
 
 // SetPresControl records what a presentation does when the change set is provisioned.

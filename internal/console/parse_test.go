@@ -19,6 +19,17 @@ func TestParseLineReadsFeedTargetAndArgs(t *testing.T) {
 	}
 }
 
+func TestAWebAddressIsATargetEvenWithEqualsSigns(t *testing.T) {
+	line, _ := ParseLine("background setBackground https://example.com/sky.jpg?w=1920&q=80")
+	request, err := line.Request()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Target != "https://example.com/sky.jpg?w=1920&q=80" || len(request.Args) != 0 {
+		t.Fatalf("got target %q, args %v", request.Target, request.Args)
+	}
+}
+
 func TestQuotesKeepSpaces(t *testing.T) {
 	words, open := split(`video playFile "my promo.mp4" mode=squeezeBack`)
 	if open || !slices.Equal(words, []string{"video", "playFile", "my promo.mp4", "mode=squeezeBack"}) {

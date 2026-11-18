@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -15,9 +16,13 @@ import (
 // change is sent to the pages (health backgroundSync).
 const backgroundRotation = time.Hour
 
+// Downloaded backgrounds (setBackground with a web address) are kept in persistentCache/backgrounds and
+// served from here.
+const downloadedBackgroundsRoute = "/persistentCache/backgrounds"
+
 // BackgroundState is the on-air background, as the pages are told it.
 type BackgroundState struct {
-	Image  string `json:"image"`  // a path under public/, or "" for none
+	Image  string `json:"image"`  // a served path, e.g. /images/bg_images/..., or "" for none
 	Hidden bool   `json:"hidden"` // hideBackground: the wallpaper fades out
 }
 
@@ -26,6 +31,7 @@ type BackgroundState struct {
 type BackgroundManager struct {
 	mu           sync.RWMutex
 	publicDir    string
+	downloadDir  string // where downloadedBackgroundsRoute is served from
 	index        map[string]map[string][]string
 	selected     string
 	selectedCond string
@@ -36,9 +42,10 @@ type BackgroundManager struct {
 	onChange     func(BackgroundState)
 }
 
-func NewBackgroundManager(publicDir string) *BackgroundManager {
+func NewBackgroundManager(publicDir, workspaceDir string) *BackgroundManager {
 	return &BackgroundManager{
 		publicDir:    publicDir,
+		downloadDir:  filepath.Join(workspaceDir, "persistentCache", "backgrounds"),
 		index:        buildBackgroundIndex(publicDir),
 		selectedCond: "wxgood",
 	}
@@ -109,25 +116,53 @@ func (b *BackgroundManager) State() BackgroundState {
 	return BackgroundState{Image: image, Hidden: b.hidden}
 }
 
-// Pin puts one image on air until another is pinned, or "auto" returns to rotation. The path is relative
-// to public/, e.g. images/bg_images/winter/wxgood/lake.avif. Pinning also shows a hidden background.
-func (b *BackgroundManager) Pin(image string) error {
-	b.mu.Lock()
-	if image == "auto" {
-		b.pinned = ""
-	} else {
-		image = "/" + strings.TrimPrefix(filepath.ToSlash(image), "/")
-		absolute := filepath.Join(b.publicDir, filepath.FromSlash(strings.TrimPrefix(image, "/")))
-		if !isPathInPublicDir(b.publicDir, absolute) || !fileExists(absolute) || !isBackgroundImage(absolute) {
-			b.mu.Unlock()
-			return fmt.Errorf("no background image at %s", image)
+// Pin puts one image on air until another is pinned, or "auto" returns to rotation. The image is a path
+// relative to public/, e.g. images/bg_images/winter/wxgood/lake.avif, or a web address, which is
+// downloaded first and shown from the copy. Pinning also shows a hidden background.
+func (b *BackgroundManager) Pin(ctx context.Context, image string) error {
+	if isURL(image) {
+		name, err := downloadImage(ctx, image, b.downloadDir)
+		if err != nil {
+			return err
 		}
-		b.pinned = image
+		b.mu.Lock()
+		b.pinned = downloadedBackgroundsRoute + "/" + name
+	} else {
+		b.mu.Lock()
+		if err := b.pinLocal(image); err != nil {
+			b.mu.Unlock()
+			return err
+		}
 	}
 	b.hidden = false
 	b.mu.Unlock()
 	b.changed()
 	return nil
+}
+
+func (b *BackgroundManager) pinLocal(image string) error {
+	if image == "auto" {
+		b.pinned = ""
+		return nil
+	}
+	image = "/" + strings.TrimPrefix(filepath.ToSlash(image), "/")
+	absolute := filepath.Join(b.publicDir, filepath.FromSlash(strings.TrimPrefix(image, "/")))
+	if !isPathInPublicDir(b.publicDir, absolute) || !fileExists(absolute) || !isBackgroundImage(absolute) {
+		return fmt.Errorf("no background image at %s", image)
+	}
+	b.pinned = image
+	return nil
+}
+
+// File is where a served background path (CurrentImage) lives on disk: a downloaded copy, or a file
+// under public/. ok is false for a path outside both.
+func (b *BackgroundManager) File(served string) (path string, ok bool) {
+	if name, downloaded := strings.CutPrefix(served, downloadedBackgroundsRoute+"/"); downloaded {
+		path = filepath.Join(b.downloadDir, filepath.FromSlash(name))
+		return path, isPathInPublicDir(b.downloadDir, path)
+	}
+	path = filepath.Join(b.publicDir, filepath.FromSlash(strings.TrimPrefix(served, "/")))
+	return path, isPathInPublicDir(b.publicDir, path)
 }
 
 // Hide fades the background out on every page until one is pinned again (Pin, including "auto").

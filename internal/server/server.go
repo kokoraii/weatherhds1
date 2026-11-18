@@ -73,7 +73,7 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 	if err != nil {
 		return err
 	}
-	backgrounds := NewBackgroundManager(publicDir)
+	backgrounds := NewBackgroundManager(publicDir, workspaceDir)
 	vocalLocalService, err := vocallocal.NewService(publicDir)
 	if err != nil {
 		return err
@@ -231,8 +231,8 @@ func Run(ctx context.Context, embeddedWebroot fs.FS) error {
 		if selected == "" {
 			return c.String(http.StatusNoContent, "Background image not initialized.")
 		}
-		absolutePath := filepath.Join(publicDir, filepath.FromSlash(strings.TrimPrefix(selected, "/")))
-		if !isPathInPublicDir(publicDir, absolutePath) {
+		absolutePath, ok := backgrounds.File(selected)
+		if !ok {
 			return c.String(http.StatusBadRequest, "Invalid background image path.")
 		}
 		if !fileExists(absolutePath) {

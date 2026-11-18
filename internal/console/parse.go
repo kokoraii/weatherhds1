@@ -36,7 +36,8 @@ func ParseLine(text string) (Line, error) {
 }
 
 // Request turns the line into a control request. The first two words are the type and command; a word
-// without "=" after them is the target, and the rest are key=value arguments.
+// without "=" after them is the target, and the rest are key=value arguments. A web address is always a
+// target, whatever "=" its query has.
 func (l Line) Request() (control.Request, error) {
 	if len(l.Words) < 2 {
 		return control.Request{}, fmt.Errorf("type a command, e.g. presentation pause main (help lists them)")
@@ -48,6 +49,7 @@ func (l Line) Request() (control.Request, error) {
 	}
 	for _, word := range l.Words[2:] {
 		key, value, isArg := strings.Cut(word, "=")
+		isArg = isArg && !strings.Contains(word, "://")
 		switch {
 		case isArg:
 			if request.Args == nil {
