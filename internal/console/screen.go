@@ -5,11 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/cursor"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 const (
@@ -30,14 +29,15 @@ type styles struct {
 	header, hint, suggestion, echo, output, failure lipgloss.Style
 }
 
-func newStyles(r *lipgloss.Renderer) styles {
+// newStyles is the console's look. Bubble Tea fits the colours to each terminal (local or SSH) itself.
+func newStyles() styles {
 	return styles{
-		header:     r.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#1f5a8a")).Padding(0, 1),
-		hint:       r.NewStyle().Foreground(lipgloss.Color("#8a96a3")),
-		suggestion: r.NewStyle().Foreground(lipgloss.Color("#7fc4ff")),
-		echo:       r.NewStyle().Foreground(lipgloss.Color("#7fc4ff")),
-		output:     r.NewStyle().Foreground(lipgloss.Color("#d8dee6")),
-		failure:    r.NewStyle().Foreground(lipgloss.Color("#ff7a6b")),
+		header:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#1f5a8a")).Padding(0, 1),
+		hint:       lipgloss.NewStyle().Foreground(lipgloss.Color("#8a96a3")),
+		suggestion: lipgloss.NewStyle().Foreground(lipgloss.Color("#7fc4ff")),
+		echo:       lipgloss.NewStyle().Foreground(lipgloss.Color("#7fc4ff")),
+		output:     lipgloss.NewStyle().Foreground(lipgloss.Color("#d8dee6")),
+		failure:    lipgloss.NewStyle().Foreground(lipgloss.Color("#ff7a6b")),
 	}
 }
 
@@ -73,22 +73,24 @@ type commandDone struct {
 	exit   bool
 }
 
-func newScreen(c *Console, who string, local bool, quit func(), quitHint string, renderer *lipgloss.Renderer) *screen {
+func newScreen(c *Console, who string, local bool, quit func(), quitHint string) *screen {
 	backlog, logs, unsubscribe := c.opts.Broker.Subscribe()
 	input := textinput.New()
 	input.Prompt = promptText
-	input.Cursor.SetMode(cursor.CursorStatic) // no blinking: nothing repaints while idle
+	inputStyles := input.Styles()
+	inputStyles.Cursor.Blink = false // nothing repaints while idle
+	input.SetStyles(inputStyles)
 	s := &screen{
 		console:     c,
 		who:         who,
 		local:       local,
 		quit:        quit,
 		quitHint:    quitHint,
-		styles:      newStyles(renderer),
+		styles:      newStyles(),
 		lines:       backlog,
 		logs:        logs,
 		unsubscribe: unsubscribe,
-		view:        viewport.New(80, 20),
+		view:        viewport.New(viewport.WithWidth(80), viewport.WithHeight(20)),
 		input:       input,
 		status:      c.opts.Status(),
 	}
@@ -117,9 +119,9 @@ func (s *screen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		s.width = msg.Width
-		s.view.Width = msg.Width
-		s.view.Height = max(1, msg.Height-1-footerHeight)
-		s.input.Width = max(10, msg.Width-len(promptText)-1)
+		s.view.SetWidth(msg.Width)
+		s.view.SetHeight(max(1, msg.Height-1-footerHeight))
+		s.input.SetWidth(max(10, msg.Width-len(promptText)-1))
 		s.refresh(true)
 		return s, nil
 	case logLine:
@@ -144,14 +146,14 @@ func (s *screen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s.append(s.styles.failure.Render("  " + msg.err.Error()))
 		}
 		return s, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return s.key(msg)
 	}
 	return s, nil
 }
 
-func (s *screen) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.Type == tea.KeyCtrlC {
+func (s *screen) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "ctrl+c" {
 		s.unsubscribe()
 		s.quit()
 		return s, tea.Quit
@@ -169,11 +171,11 @@ func (s *screen) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return s, cmd
 	}
 
-	switch msg.Type {
-	case tea.KeyEsc:
+	switch msg.String() {
+	case "esc":
 		s.closePrompt()
 		return s, nil
-	case tea.KeyEnter:
+	case "enter":
 		line := strings.TrimSpace(s.input.Value())
 		s.closePrompt()
 		if line == "" {
@@ -182,11 +184,11 @@ func (s *screen) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		s.remember(line)
 		s.append(s.styles.echo.Render(promptText + line))
 		return s, s.run(line)
-	case tea.KeyTab:
+	case "tab":
 		s.complete()
 		return s, nil
-	case tea.KeyUp, tea.KeyDown:
-		s.browseHistory(msg.Type == tea.KeyUp)
+	case "up", "down":
+		s.browseHistory(msg.String() == "up")
 		return s, nil
 	}
 	var cmd tea.Cmd
@@ -276,7 +278,7 @@ func (s *screen) refresh(follow bool) {
 	}
 }
 
-func (s *screen) View() string {
+func (s *screen) View() tea.View {
 	st := s.status
 	feeds := "none"
 	if len(st.Feeds) > 0 {
@@ -294,7 +296,9 @@ func (s *screen) View() string {
 	} else {
 		footer = s.styles.hint.Render("/ for commands · ↑ ↓ PgUp PgDn scroll · "+s.quitHint) + "\n"
 	}
-	return header + "\n" + s.view.View() + "\n" + footer
+	view := tea.NewView(header + "\n" + s.view.View() + "\n" + footer)
+	view.AltScreen = true
+	return view
 }
 
 func formatUptime(d time.Duration) string {

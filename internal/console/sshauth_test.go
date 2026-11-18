@@ -121,3 +121,15 @@ func TestMatchListAndAddresses(t *testing.T) {
 		t.Fatal("wildcard and negated addresses")
 	}
 }
+
+func TestAMissingConfigMeansSSHDDefaults(t *testing.T) {
+	config, err := readSSHDConfig(filepath.Join(t.TempDir(), "absent"))
+	if err == nil || !unreadable(err) {
+		t.Fatalf("expected an unreadable-config error, got %v", err)
+	}
+	acct := account{name: "rai", home: "/home/rai"}
+	files := config.settingsFor(acct, "10.0.0.1").authorizedKeysFiles(acct)
+	if len(files) != 2 || !strings.HasSuffix(filepath.ToSlash(files[0]), ".ssh/authorized_keys") {
+		t.Fatalf("defaults should be ~/.ssh/authorized_keys and authorized_keys2, got %q", files)
+	}
+}

@@ -18,6 +18,10 @@ import (
 // Authorizer decides who may open the console over SSH the way the machine's own sshd would: the name
 // must be a system user, and the key must be in an AuthorizedKeysFile that sshd_config names for them.
 // The config is read on every login, so edits apply at once. Only public keys are accepted.
+//
+// Where the config can't be read (many distributions keep it root-only, and the server usually runs as
+// an ordinary user), sshd's defaults apply: ~/.ssh/authorized_keys. A server running as one user can
+// only read that user's own key files anyway, so in practice that user's keys are the ones let in.
 type Authorizer struct {
 	ConfigPath string
 }
@@ -35,7 +39,7 @@ func (a *Authorizer) Allows(username, remoteIP string, key gossh.PublicKey) (boo
 		return false, "no such user"
 	}
 	config, err := readSSHDConfig(a.ConfigPath)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !unreadable(err) {
 		return false, "can't read " + a.ConfigPath + ": " + err.Error()
 	}
 	settings := config.settingsFor(acct, remoteIP)
@@ -63,6 +67,11 @@ func lookupAccount(username string) (account, error) {
 		}
 	}
 	return acct, nil
+}
+
+// unreadable is a config file that's missing or off limits to this process: sshd's defaults apply.
+func unreadable(err error) bool {
+	return os.IsNotExist(err) || os.IsPermission(err)
 }
 
 // directive is one line of sshd_config: a keyword (lowercased) and its arguments.
@@ -107,7 +116,7 @@ func (c *sshdConfig) read(file, baseDir string, depth int) error {
 			}
 			matches, _ := filepath.Glob(pattern)
 			for _, match := range matches {
-				if err := c.read(match, baseDir, depth+1); err != nil && !os.IsNotExist(err) {
+				if err := c.read(match, baseDir, depth+1); err != nil && !unreadable(err) {
 					return err
 				}
 			}

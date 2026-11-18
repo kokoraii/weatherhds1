@@ -11,12 +11,11 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
-	"github.com/charmbracelet/wish/activeterm"
-	bm "github.com/charmbracelet/wish/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/ssh"
+	"charm.land/wish/v2"
+	"charm.land/wish/v2/activeterm"
+	bm "charm.land/wish/v2/bubbletea"
 	"github.com/mattn/go-isatty"
 
 	"weatherhds/internal/control"
@@ -59,8 +58,8 @@ func Start(ctx context.Context, opts Options) *Console {
 
 func (c *Console) runLocal(ctx context.Context) {
 	c.opts.Broker.SetEcho(nil)
-	scr := newScreen(c, "console", true, c.opts.Stop, "Ctrl+C stops the server", lipgloss.DefaultRenderer())
-	program := tea.NewProgram(scr, tea.WithAltScreen(), tea.WithContext(ctx))
+	scr := newScreen(c, "console", true, c.opts.Stop, "Ctrl+C stops the server")
+	program := tea.NewProgram(scr, tea.WithContext(ctx))
 	go func() {
 		_, err := program.Run()
 		c.opts.Broker.SetEcho(os.Stdout) // shutdown messages print to the terminal again
@@ -127,13 +126,13 @@ func (c *Console) hostKeyOption() (ssh.Option, error) {
 func (c *Console) sshScreen(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
 	who := "ssh:" + sess.User() + "@" + remoteIP(sess.RemoteAddr())
 	c.opts.Log("SSH console opened by %s", who)
-	scr := newScreen(c, who, false, func() {}, "Ctrl+C or exit disconnects", bm.MakeRenderer(sess))
+	scr := newScreen(c, who, false, func() {}, "Ctrl+C or exit disconnects")
 	go func() {
 		<-sess.Context().Done()
 		scr.unsubscribe()
 		c.opts.Log("SSH console closed by %s", who)
 	}()
-	return scr, []tea.ProgramOption{tea.WithAltScreen()}
+	return scr, nil
 }
 
 // execute carries out one line typed at the prompt and returns what to show for it. Commands sent to
